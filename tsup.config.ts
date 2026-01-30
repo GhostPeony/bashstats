@@ -12,4 +12,14 @@ export default defineConfig([
       js: '#!/usr/bin/env node',
     },
   },
+  {
+    entry: ['src/hooks/scripts/*.ts'],
+    format: ['esm'],
+    outDir: 'dist/hooks',
+    sourcemap: true,
+    target: 'node18',
+    banner: {
+      js: '#!/usr/bin/env node',
+    },
+  },
 ])

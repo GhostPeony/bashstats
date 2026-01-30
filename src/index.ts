@@ -1,2 +1,8 @@
-// bashstats - Obsessive stat tracking for Claude Code
-export const VERSION = '0.1.0'
+export { BashStatsDB } from './db/database.js'
+export { BashStatsWriter } from './db/writer.js'
+export { StatsEngine } from './stats/engine.js'
+export { AchievementEngine } from './achievements/compute.js'
+export { install, uninstall, isInstalled } from './installer/installer.js'
+export { handleHookEvent, parseHookEvent, detectAgent } from './hooks/handler.js'
+export * from './types.js'
+export * from './constants.js'

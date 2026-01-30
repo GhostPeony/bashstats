@@ -1,4 +1,5 @@
 # bashstats
+<img width="1727" height="916" alt="bashstats2" src="https://github.com/user-attachments/assets/4029e711-f559-4771-9490-dedd4aeec1ee" />
 
 Obsessive stat tracking, achievements, and badges for Claude Code sessions.
 

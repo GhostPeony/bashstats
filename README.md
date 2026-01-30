@@ -1,10 +1,10 @@
 # bashstats
 <img width="1727" height="916" alt="bashstats2" src="https://github.com/user-attachments/assets/4029e711-f559-4771-9490-dedd4aeec1ee" />
 
-Obsessive stat tracking, achievements, and badges for Claude Code sessions.
-
-Think Skyrim stat screens for your coding sessions. Every prompt, tool call, session, and streak is tracked automatically via Claude Code hooks, stored in a local SQLite database, and presented through a CLI and browser dashboard.
-
+Track every prompt, tool call, and late-night coding session. Earn badges. Build streaks. Watch your rank climb from Bronze to Obsidian.
+bashstats hooks into Claude Code and quietly records everything — sessions, prompts, tool usage, errors, and streaks. It then turns it all into stats,
+achievements, and a dashboard you'll check way too often.
+  
 ## Install
 
 ```bash
@@ -63,6 +63,7 @@ bashstats hooks into 12 Claude Code events:
 | Setup | Initialization events |
 
 ## Achievements
+<img width="1732" height="917" alt="bashstats" src="https://github.com/user-attachments/assets/63591b76-54ff-4659-b81a-e6310810e364" />
 
 53 badges across 10 categories, each with 5 tiers: Bronze, Silver, Gold, Diamond, Obsidian.
 

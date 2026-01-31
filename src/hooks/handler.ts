@@ -14,7 +14,7 @@ import { normalizeCopilotEvent } from './normalizers/copilot.js'
  * Currently supports Claude Code (default), Gemini CLI, Copilot CLI, and OpenCode.
  */
 export function detectAgent(): AgentType {
-  if (process.env.GEMINI_SESSION_ID || process.env.GEMINI_PROJECT_DIR || process.env.GEMINI_CLI || process.env.GEMINI_API_KEY) return 'gemini-cli'
+  if (process.env.GEMINI_SESSION_ID || process.env.GEMINI_PROJECT_DIR || process.env.GEMINI_CLI) return 'gemini-cli'
   if (process.env.GITHUB_COPILOT_CLI) return 'copilot-cli'
   if (process.env.OPENCODE) return 'opencode'
   return 'claude-code'

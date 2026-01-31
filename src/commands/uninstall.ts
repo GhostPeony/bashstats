@@ -13,7 +13,8 @@ export function runUninstall(): void {
   console.log(claudeResult.message)
 
   const geminiResult = uninstallGemini()
-  if (geminiResult.message !== 'No Gemini settings found.') console.log(geminiResult.message)
+  if (geminiResult.success && !geminiResult.message.includes('nothing to uninstall')) console.log(geminiResult.message)
+  else if (!geminiResult.success) console.log(geminiResult.message)
 
   const copilotResult = uninstallCopilot()
   console.log(copilotResult.message)

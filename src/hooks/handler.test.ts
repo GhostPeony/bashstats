@@ -36,7 +36,6 @@ describe('detectAgent', () => {
     'GEMINI_SESSION_ID',
     'GEMINI_PROJECT_DIR',
     'GEMINI_CLI',
-    'GEMINI_API_KEY',
     'GITHUB_COPILOT_CLI',
     'OPENCODE',
   ]
@@ -73,11 +72,6 @@ describe('detectAgent', () => {
 
   it('should return gemini-cli when GEMINI_CLI is set', () => {
     process.env.GEMINI_CLI = '1'
-    expect(detectAgent()).toBe('gemini-cli')
-  })
-
-  it('should return gemini-cli when GEMINI_API_KEY is set', () => {
-    process.env.GEMINI_API_KEY = 'key-abc'
     expect(detectAgent()).toBe('gemini-cli')
   })
 

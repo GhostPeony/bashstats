@@ -52,7 +52,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'SessionStart',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         source: 'startup',
         model: 'gpt-4o',
       },
@@ -65,7 +65,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'SessionStart',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         source: 'resume',
         model: 'gpt-4o',
       },
@@ -84,10 +84,10 @@ describe('normalizeCopilotEvent', () => {
     expect(result!.payload.source).toBe('startup')
   })
 
-  it('should derive session_id from process.pid and date', () => {
+  it('should derive session_id from process.ppid and date', () => {
     const raw = { source: 'new' }
     const result = normalizeCopilotEvent('sessionStart', raw)
-    expect(result!.payload.session_id).toBe(`copilot-${process.pid}-${mockDate}`)
+    expect(result!.payload.session_id).toBe(`copilot-${process.ppid}-${mockDate}`)
   })
 
   // --- sessionEnd -> Stop ---
@@ -98,7 +98,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'Stop',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         reason: 'user_exit',
         stop_hook_active: false,
       },
@@ -113,7 +113,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'UserPromptSubmit',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         prompt: 'fix the bug',
       },
     })
@@ -130,7 +130,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'PreToolUse',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         tool_name: 'Bash',
         tool_input: { command: 'ls -la' },
       },
@@ -169,7 +169,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'PostToolUse',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         tool_name: 'Read',
         tool_input: { file_path: '/tmp/test.ts' },
         tool_response: { resultType: 'success', output: 'file contents here' },
@@ -206,7 +206,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'PostToolUseFailure',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         tool_name: 'Bash',
         tool_input: { command: 'exit 1' },
         tool_response: { resultType: 'failure', error: 'command failed' },
@@ -253,7 +253,7 @@ describe('normalizeCopilotEvent', () => {
     expect(result).toEqual({
       hookType: 'PostToolUseFailure',
       payload: {
-        session_id: `copilot-${process.pid}-${mockDate}`,
+        session_id: `copilot-${process.ppid}-${mockDate}`,
         tool_name: '_error',
         tool_input: {},
         tool_response: {

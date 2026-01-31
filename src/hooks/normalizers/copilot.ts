@@ -7,7 +7,8 @@
  * Key differences from Claude/Gemini:
  *   - Copilot uses camelCase event names (sessionStart, not SessionStart)
  *   - toolArgs is a stringified JSON string, not an object
- *   - No session_id in payloads -- derived from process.pid + date
+ *   - No session_id in payloads -- derived from PPID + date (parent process
+ *     is the Copilot CLI process, consistent across all hook invocations)
  *   - postToolUse can be success OR failure based on toolResult.resultType
  *   - errorOccurred maps to PostToolUseFailure with tool_name="_error"
  *   - source values: "new" -> "startup", "resume" -> "resume"
@@ -31,11 +32,14 @@ export function parseToolArgs(toolArgs: string): Record<string, unknown> {
 /**
  * Derive a session ID for Copilot events.
  * Copilot doesn't provide session_id in hook payloads, so we construct one
- * from process.pid and the current date (YYYY-MM-DD).
+ * from the parent process PID (PPID) and the current date (YYYY-MM-DD).
+ * Each hook invocation spawns a new child process, but the parent (Copilot CLI)
+ * stays the same for the entire session, so PPID is consistent across events.
  */
 function deriveSessionId(): string {
   const date = new Date().toISOString().slice(0, 10)
-  return `copilot-${process.pid}-${date}`
+  const ppid = process.ppid ?? process.pid
+  return `copilot-${ppid}-${date}`
 }
 
 /**

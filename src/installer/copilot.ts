@@ -110,7 +110,7 @@ export function uninstallCopilot(): { success: boolean; message: string } {
  */
 export function isCopilotAvailable(): boolean {
   try {
-    execSync('copilot --version', { stdio: 'ignore' })
+    execSync('copilot --version', { stdio: 'ignore', timeout: 5000 })
     return true
   } catch {
     return false

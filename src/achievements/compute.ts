@@ -1,6 +1,6 @@
 import { BashStatsDB } from '../db/database.js'
 import { StatsEngine } from '../stats/engine.js'
-import { BADGE_DEFINITIONS, RANK_THRESHOLDS, TIER_XP } from '../constants.js'
+import { BADGE_DEFINITIONS, TIER_XP, xpForRank, rankTierForRank } from '../constants.js'
 import type {
   BadgeResult,
   BadgeTier,
@@ -91,6 +91,7 @@ export class AchievementEngine {
         nextThreshold,
         progress,
         maxed,
+        trigger: badge.trigger,
         secret: badge.secret ?? false,
         unlocked: tier > 0,
       }
@@ -103,11 +104,10 @@ export class AchievementEngine {
 
     // Calculate XP from activity
     let totalXP = 0
-    totalXP += allStats.lifetime.totalPrompts * 1       // +1 per prompt
-    totalXP += allStats.lifetime.totalToolCalls * 1      // +1 per tool call
-    totalXP += allStats.lifetime.totalSessions * 10      // +10 per session
-    totalXP += allStats.time.nightOwlCount * 2           // +2 per night owl prompt
-    totalXP += Math.floor(allStats.time.longestStreak / 100) * 25  // +25 per 100 in longest streak
+    totalXP += allStats.lifetime.totalPrompts * 1              // +1 per prompt
+    totalXP += allStats.lifetime.totalSessions * 5             // +5 per session
+    totalXP += Math.floor(allStats.lifetime.totalDurationSeconds / 3600) * 10  // +10 per hour
+    totalXP += allStats.time.longestStreak * 5                 // +5 per streak day
 
     // Badge tier XP
     for (const badge of badges) {
@@ -116,33 +116,34 @@ export class AchievementEngine {
       }
     }
 
-    // Determine rank from RANK_THRESHOLDS (highest threshold that XP exceeds)
-    let rank = 'Bronze'
-    let nextRankXP = RANK_THRESHOLDS[RANK_THRESHOLDS.length - 2]?.xp ?? 1000 // Silver threshold
-    for (const threshold of RANK_THRESHOLDS) {
-      if (totalXP >= threshold.xp) {
-        rank = threshold.rank
+    // Determine rank number (1-500) from XP using exponential curve
+    let rankNumber = 0
+    for (let r = 500; r >= 1; r--) {
+      if (totalXP >= xpForRank(r)) {
+        rankNumber = r
         break
       }
     }
 
     // Calculate progress toward next rank
-    let progress = 0
-    const rankIndex = RANK_THRESHOLDS.findIndex(t => t.rank === rank)
-    if (rankIndex <= 0) {
-      // Already at highest rank (Obsidian)
-      nextRankXP = RANK_THRESHOLDS[0].xp
+    let nextRankXP: number
+    let progress: number
+
+    if (rankNumber >= 500) {
+      nextRankXP = xpForRank(500)
       progress = 1
     } else {
-      const currentThreshold = RANK_THRESHOLDS[rankIndex].xp
-      nextRankXP = RANK_THRESHOLDS[rankIndex - 1].xp
+      const nextRank = rankNumber + 1
+      nextRankXP = xpForRank(nextRank)
+      const currentThreshold = rankNumber > 0 ? xpForRank(rankNumber) : 0
       const range = nextRankXP - currentThreshold
       progress = range > 0 ? Math.min((totalXP - currentThreshold) / range, 0.99) : 0
     }
 
     return {
       totalXP,
-      rank,
+      rankNumber,
+      rankTier: rankTierForRank(rankNumber || 1),
       nextRankXP,
       progress,
     }
@@ -230,6 +231,119 @@ export class AchievementEngine {
     // Aspirational
     flat.totalXP = 0 // computed after XP is calculated; set to 0 for badge pass
     flat.allToolsObsidian = 0 // computed after all badges; set to 0 for first pass
+    flat.allNonSecretBadgesUnlocked = 0 // computed after all badges; set to 0
+
+    // ===================================================================
+    // NEW: Time & Patterns
+    // ===================================================================
+    flat.witchingHourPrompts = this.queryWitchingHourPrompts()
+    flat.lunchBreakDays = this.queryLunchBreakDays()
+    flat.mondaySessions = this.queryMondaySessions()
+    flat.fridayCommits = this.queryFridayCommits()
+    flat.maxUniqueHoursInDay = this.queryMaxUniqueHoursInDay()
+    flat.uniqueQuarters = this.queryUniqueQuarters()
+
+    // ===================================================================
+    // NEW: Session Behavior
+    // ===================================================================
+    flat.extendedSessionCount = this.queryExtendedSessionCount()
+    flat.quickDrawSessions = this.queryQuickDrawSessions()
+    flat.diverseToolSessions = this.queryDiverseToolSessions()
+    // totalCompactions already mapped above
+    flat.permissionRequests = this.queryPermissionRequests()
+    flat.returnerDays = this.queryReturnerDays()
+
+    // ===================================================================
+    // NEW: Prompt Patterns
+    // ===================================================================
+    flat.shortPromptCount = this.queryShortPromptCount()
+    flat.questionPromptCount = this.queryQuestionPromptCount()
+    flat.sorryPromptCount = this.querySorryPromptCount()
+    flat.capsLockPromptCount = this.queryCapsLockPromptCount()
+    flat.emojiPromptCount = this.queryEmojiPromptCount()
+    flat.codeDumpPromptCount = this.queryCodeDumpPromptCount()
+
+    // ===================================================================
+    // NEW: Error & Recovery
+    // ===================================================================
+    flat.rubberDuckCount = this.queryRubberDuckCount()
+    flat.thirdTimeCharmCount = this.queryThirdTimeCharmCount()
+    flat.undoEditCount = this.queryUndoEditCount()
+    flat.crashySessions = this.queryCrashySessions()
+    flat.totalLifetimeErrors = allStats.lifetime.totalErrors
+
+    // ===================================================================
+    // NEW: Tool Combos
+    // ===================================================================
+    flat.readEditRunCount = this.queryReadEditRunCount()
+    // totalSearches already mapped above (reused by grep_ninja)
+    flat.maxFilesCreatedInSession = this.queryMaxFilesCreatedInSession()
+    flat.maxSameFileEditsLifetime = this.queryMaxSameFileEditsLifetime()
+    flat.searchThenEditCount = this.querySearchThenEditCount()
+
+    // ===================================================================
+    // NEW: Project Dedication
+    // ===================================================================
+    flat.maxProjectSessions = this.queryMaxProjectSessions()
+    flat.maxProjectsInDay = this.queryMaxProjectsInDay()
+    flat.finishedProjects = this.queryFinishedProjects()
+    flat.legacyReturns = this.queryLegacyReturns()
+    flat.totalUniqueProjects = allStats.projects.uniqueProjects
+
+    // ===================================================================
+    // NEW: Multi-Agent (additional stats)
+    // ===================================================================
+    flat.maxConcurrentSubagents = this.queryMaxConcurrentSubagents()
+    flat.quickSubagentStops = this.queryQuickSubagentStops()
+    flat.totalSubagentSpawns = allStats.lifetime.totalSubagents
+    flat.maxSubagentsInSession = this.queryMaxSubagentsInSession()
+
+    // Cross-agent stats
+    flat.distinctAgentsUsed = this.queryScalar('SELECT COUNT(DISTINCT agent) FROM sessions')
+    flat.geminiSessions = this.queryScalar("SELECT COUNT(*) FROM sessions WHERE agent = 'gemini-cli'")
+    flat.copilotSessions = this.queryScalar("SELECT COUNT(*) FROM sessions WHERE agent = 'copilot-cli'")
+    flat.opencodeSessions = this.queryScalar("SELECT COUNT(*) FROM sessions WHERE agent = 'opencode'")
+    flat.doubleAgentDays = this.queryScalar(
+      "SELECT COUNT(*) FROM (SELECT substr(started_at, 1, 10) as d FROM sessions GROUP BY d HAVING COUNT(DISTINCT agent) >= 2)"
+    )
+    flat.agentSwitchDays = flat.doubleAgentDays
+
+    // ===================================================================
+    // NEW: Humor & Meta (additional stats)
+    // ===================================================================
+    flat.dejaVuCount = this.queryDejaVuCount()
+    flat.trustIssueCount = this.queryTrustIssueCount()
+    flat.backseatDriverCount = this.queryBackseatDriverCount()
+    flat.negotiatorCount = this.queryNegotiatorCount()
+    flat.maxConsecutivePermissions = this.queryMaxConsecutivePermissions()
+    // longSessionCount already mapped above (reused by touch_grass_humor)
+    // longestErrorFreeStreak already mapped above (reused by inbox_zero)
+    flat.bashRetrySuccessCount = this.queryBashRetrySuccessCount()
+
+    // ===================================================================
+    // NEW: Secret (additional stats)
+    // ===================================================================
+    flat.easterEggActivity = this.queryEasterEggActivity()
+    flat.fullMoonSession = this.queryFullMoonSession()
+    flat.birthdaySession = this.queryBirthdaySession()
+    flat.luckyNumber = (allStats.lifetime.totalPrompts >= 777 || allStats.lifetime.totalToolCalls >= 7777) ? 1 : 0
+    flat.ghostSessions = this.queryGhostSessions()
+    flat.bullseyeSessions = this.queryBullseyeSessions()
+    flat.hasTenMillionSession = this.queryHasTenMillionSession()
+
+    // ===================================================================
+    // NEW: Token Usage
+    // ===================================================================
+    flat.totalTokens = allStats.lifetime.totalTokens
+    flat.totalOutputTokens = allStats.lifetime.totalOutputTokens
+    flat.totalCacheReadTokens = allStats.lifetime.totalCacheReadTokens
+    flat.totalCacheCreationTokens = allStats.lifetime.totalCacheCreationTokens
+    flat.totalInputTokens = allStats.lifetime.totalInputTokens
+    flat.mostTokensInSession = allStats.sessions.mostTokensInSession
+    flat.avgTokensPerSession = allStats.sessions.avgTokensPerSession
+    flat.heavyTokenSessions = this.queryHeavyTokenSessions()
+    flat.lightTokenSessions = this.queryLightTokenSessions()
+    flat.maxOutputInSession = this.queryMaxOutputInSession()
 
     return flat
   }
@@ -303,21 +417,18 @@ export class AchievementEngine {
   }
 
   private queryMaxSameFileEdits(): number {
-    // Find the most times any single file path was edited
     return this.queryScalar(
       "SELECT COUNT(*) as c FROM events WHERE tool_name = 'Edit' AND hook_type = 'PostToolUse' GROUP BY json_extract(tool_input, '$.file_path') ORDER BY c DESC LIMIT 1"
     )
   }
 
   private queryRepeatedPromptCount(): number {
-    // Total prompts that were submitted more than once (i.e., duplicates)
     return this.queryScalar(
       'SELECT COALESCE(SUM(cnt), 0) as c FROM (SELECT COUNT(*) as cnt FROM prompts GROUP BY LOWER(TRIM(content)) HAVING cnt > 1)'
     )
   }
 
   private queryLongestErrorFreeStreak(): number {
-    // Count consecutive successful tool calls without an error
     const rows = this.db.prepare(
       "SELECT hook_type FROM events WHERE hook_type IN ('PostToolUse', 'PostToolUseFailure') ORDER BY timestamp ASC"
     ).all() as { hook_type: string }[]
@@ -348,7 +459,6 @@ export class AchievementEngine {
   }
 
   private queryUniqueLanguages(): number {
-    // Estimate languages from file extensions in Edit/Write/Read events
     const rows = this.db.prepare(
       "SELECT DISTINCT json_extract(tool_input, '$.file_path') as fp FROM events WHERE tool_name IN ('Edit', 'Write', 'Read') AND hook_type = 'PostToolUse' AND tool_input IS NOT NULL"
     ).all() as { fp: string | null }[]
@@ -366,7 +476,6 @@ export class AchievementEngine {
   }
 
   private queryConcurrentAgentUses(): number {
-    // Count sessions that had subagent starts
     return this.queryScalar(
       "SELECT COUNT(DISTINCT session_id) as c FROM events WHERE hook_type = 'SubagentStart'"
     )
@@ -375,14 +484,12 @@ export class AchievementEngine {
   // === Secret stat helpers ===
 
   private queryDangerousCommandBlocked(): number {
-    // Dangerous commands that were in PreToolUse but not followed by PostToolUse
     return this.queryScalar(
       "SELECT COUNT(*) as c FROM events WHERE hook_type = 'PreToolUse' AND tool_name = 'Bash' AND (tool_input LIKE '%rm -rf%' OR tool_input LIKE '%rm -r /%')"
     )
   }
 
   private queryReturnAfterBreak(): number {
-    // Sessions after a 7+ day gap
     const rows = this.db.prepare(
       'SELECT started_at FROM sessions ORDER BY started_at ASC'
     ).all() as { started_at: string }[]
@@ -404,7 +511,6 @@ export class AchievementEngine {
   }
 
   private queryMidnightSpanSession(): number {
-    // Session that started before midnight and ended after midnight
     const rows = this.db.prepare(
       "SELECT started_at, ended_at FROM sessions WHERE ended_at IS NOT NULL"
     ).all() as { started_at: string; ended_at: string }[]
@@ -418,14 +524,12 @@ export class AchievementEngine {
   }
 
   private queryNestedSubagent(): number {
-    // Any subagent activity is a proxy for nested subagent detection
     return this.queryScalar(
       "SELECT COUNT(*) as c FROM events WHERE hook_type = 'SubagentStart'"
     ) > 0 ? 1 : 0
   }
 
   private queryHolidayActivity(): number {
-    // Check for sessions on major US holidays (Dec 25, Jan 1, Jul 4, Nov last Thursday)
     const holidays = this.queryScalar(
       "SELECT COUNT(*) as c FROM sessions WHERE strftime('%m-%d', started_at) IN ('12-25', '01-01', '07-04')"
     )
@@ -433,14 +537,12 @@ export class AchievementEngine {
   }
 
   private querySpeedRunSession(): number {
-    // Session under 20 seconds with tool usage
     return this.queryScalar(
       'SELECT COUNT(*) as c FROM sessions WHERE duration_seconds IS NOT NULL AND duration_seconds <= 20 AND tool_count > 0'
     ) > 0 ? 1 : 0
   }
 
   private queryAllToolsInSession(): number {
-    // Session that used Bash, Read, Write, Edit, Grep, Glob, and WebFetch
     const requiredTools = ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'WebFetch']
     const rows = this.db.prepare(
       "SELECT session_id, COUNT(DISTINCT tool_name) as cnt FROM events WHERE hook_type = 'PostToolUse' AND tool_name IN ('Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'WebFetch') GROUP BY session_id"
@@ -450,5 +552,572 @@ export class AchievementEngine {
       if (row.cnt >= requiredTools.length) return 1
     }
     return 0
+  }
+
+  // ===================================================================
+  // NEW: Time & Patterns queries
+  // ===================================================================
+
+  private queryWitchingHourPrompts(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM prompts WHERE CAST(strftime('%H', timestamp) AS INTEGER) BETWEEN 2 AND 3"
+    )
+  }
+
+  private queryLunchBreakDays(): number {
+    return this.queryScalar(
+      "SELECT COUNT(DISTINCT strftime('%Y-%m-%d', started_at)) as c FROM sessions WHERE CAST(strftime('%H', started_at) AS INTEGER) = 12"
+    )
+  }
+
+  private queryMondaySessions(): number {
+    // SQLite strftime('%w') returns 1 for Monday
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM sessions WHERE CAST(strftime('%w', started_at) AS INTEGER) = 1"
+    )
+  }
+
+  private queryFridayCommits(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%git commit%' AND CAST(strftime('%w', timestamp) AS INTEGER) = 5"
+    )
+  }
+
+  private queryMaxUniqueHoursInDay(): number {
+    return this.queryScalar(
+      "SELECT COUNT(DISTINCT CAST(strftime('%H', timestamp) AS INTEGER)) as c FROM prompts GROUP BY strftime('%Y-%m-%d', timestamp) ORDER BY c DESC LIMIT 1"
+    )
+  }
+
+  private queryUniqueQuarters(): number {
+    // Count unique year-quarter combos (e.g. 2025-Q1, 2025-Q2, 2026-Q1 = 3)
+    return this.queryScalar(
+      "SELECT COUNT(DISTINCT (strftime('%Y', timestamp) || '-Q' || CASE WHEN CAST(strftime('%m', timestamp) AS INTEGER) BETWEEN 1 AND 3 THEN '1' WHEN CAST(strftime('%m', timestamp) AS INTEGER) BETWEEN 4 AND 6 THEN '2' WHEN CAST(strftime('%m', timestamp) AS INTEGER) BETWEEN 7 AND 9 THEN '3' ELSE '4' END)) as c FROM prompts"
+    )
+  }
+
+  // ===================================================================
+  // NEW: Session Behavior queries
+  // ===================================================================
+
+  private queryExtendedSessionCount(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE duration_seconds IS NOT NULL AND duration_seconds > 3600 AND prompt_count >= 15'
+    )
+  }
+
+  private queryQuickDrawSessions(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE duration_seconds IS NOT NULL AND duration_seconds < 120 AND tool_count > 0'
+    )
+  }
+
+  private queryDiverseToolSessions(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM (SELECT session_id FROM events WHERE hook_type = 'PostToolUse' AND tool_name IS NOT NULL GROUP BY session_id HAVING COUNT(DISTINCT tool_name) >= 5)"
+    )
+  }
+
+  private queryPermissionRequests(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM events WHERE hook_type = 'PermissionRequest'"
+    )
+  }
+
+  private queryReturnerDays(): number {
+    // Days where a single project had 5+ sessions
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM (SELECT strftime('%Y-%m-%d', started_at) as d, project FROM sessions WHERE project IS NOT NULL GROUP BY d, project HAVING COUNT(*) >= 5)"
+    )
+  }
+
+  // ===================================================================
+  // NEW: Prompt Patterns queries
+  // ===================================================================
+
+  private queryShortPromptCount(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM prompts WHERE word_count < 10'
+    )
+  }
+
+  private queryQuestionPromptCount(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM prompts WHERE TRIM(content) LIKE '%?'"
+    )
+  }
+
+  private querySorryPromptCount(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM prompts WHERE LOWER(content) LIKE '%sorry%'"
+    )
+  }
+
+  private queryCapsLockPromptCount(): number {
+    // Prompts that are fully uppercase and at least 10 chars
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM prompts WHERE content = UPPER(content) AND char_count >= 10"
+    )
+  }
+
+  private queryEmojiPromptCount(): number {
+    // Count prompts containing emoji characters using a range check
+    // SQLite doesn't have great emoji support, so we check for characters above the basic multilingual plane
+    const rows = this.db.prepare(
+      'SELECT content FROM prompts'
+    ).all() as { content: string }[]
+
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1FA00}-\u{1FAFF}]/u
+    let count = 0
+    for (const row of rows) {
+      if (emojiRegex.test(row.content)) {
+        count++
+      }
+    }
+    return count
+  }
+
+  private queryCodeDumpPromptCount(): number {
+    // Prompts with 50+ newlines (proxy for 50+ lines)
+    const rows = this.db.prepare(
+      'SELECT content FROM prompts WHERE char_count > 200'
+    ).all() as { content: string }[]
+
+    let count = 0
+    for (const row of rows) {
+      const lineCount = row.content.split('\n').length
+      if (lineCount >= 50) count++
+    }
+    return count
+  }
+
+  // ===================================================================
+  // NEW: Error & Recovery queries
+  // ===================================================================
+
+  private queryRubberDuckCount(): number {
+    // Error followed by success on same tool without Edit in between
+    const rows = this.db.prepare(
+      "SELECT hook_type, tool_name FROM events WHERE hook_type IN ('PostToolUse', 'PostToolUseFailure') ORDER BY timestamp ASC"
+    ).all() as { hook_type: string; tool_name: string | null }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1]
+      const curr = rows[i]
+      if (
+        prev.hook_type === 'PostToolUseFailure' &&
+        curr.hook_type === 'PostToolUse' &&
+        prev.tool_name === curr.tool_name &&
+        curr.tool_name !== 'Edit'
+      ) {
+        count++
+      }
+    }
+    return count
+  }
+
+  private queryThirdTimeCharmCount(): number {
+    // Tool success after 2+ consecutive failures of same tool
+    const rows = this.db.prepare(
+      "SELECT hook_type, tool_name FROM events WHERE hook_type IN ('PostToolUse', 'PostToolUseFailure') ORDER BY timestamp ASC"
+    ).all() as { hook_type: string; tool_name: string | null }[]
+
+    let count = 0
+    let failStreak = 0
+    let failTool: string | null = null
+
+    for (const row of rows) {
+      if (row.hook_type === 'PostToolUseFailure') {
+        if (row.tool_name === failTool) {
+          failStreak++
+        } else {
+          failStreak = 1
+          failTool = row.tool_name
+        }
+      } else if (row.hook_type === 'PostToolUse') {
+        if (failStreak >= 2 && row.tool_name === failTool) {
+          count++
+        }
+        failStreak = 0
+        failTool = null
+      }
+    }
+    return count
+  }
+
+  private queryUndoEditCount(): number {
+    // Back-to-back Edit on same file within same session
+    const rows = this.db.prepare(
+      "SELECT session_id, json_extract(tool_input, '$.file_path') as fp FROM events WHERE tool_name = 'Edit' AND hook_type = 'PostToolUse' AND tool_input IS NOT NULL ORDER BY timestamp ASC"
+    ).all() as { session_id: string; fp: string | null }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].session_id === rows[i - 1].session_id && rows[i].fp === rows[i - 1].fp && rows[i].fp) {
+        count++
+      }
+    }
+    return count
+  }
+
+  private queryCrashySessions(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE error_count >= 10'
+    )
+  }
+
+  // ===================================================================
+  // NEW: Tool Combos queries
+  // ===================================================================
+
+  private queryReadEditRunCount(): number {
+    // Detect Read → Edit → Bash sequences
+    const rows = this.db.prepare(
+      "SELECT tool_name FROM events WHERE hook_type = 'PostToolUse' AND tool_name IN ('Read', 'Edit', 'Bash') ORDER BY timestamp ASC"
+    ).all() as { tool_name: string }[]
+
+    let count = 0
+    for (let i = 2; i < rows.length; i++) {
+      if (rows[i - 2].tool_name === 'Read' && rows[i - 1].tool_name === 'Edit' && rows[i].tool_name === 'Bash') {
+        count++
+      }
+    }
+    return count
+  }
+
+  private queryMaxFilesCreatedInSession(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM events WHERE tool_name = 'Write' AND hook_type = 'PostToolUse' GROUP BY session_id ORDER BY c DESC LIMIT 1"
+    )
+  }
+
+  private queryMaxSameFileEditsLifetime(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM events WHERE tool_name = 'Edit' AND hook_type = 'PostToolUse' GROUP BY json_extract(tool_input, '$.file_path') ORDER BY c DESC LIMIT 1"
+    )
+  }
+
+  private querySearchThenEditCount(): number {
+    // Grep/Glob followed by Edit within same session (adjacent or within 5 events)
+    const rows = this.db.prepare(
+      "SELECT session_id, tool_name FROM events WHERE hook_type = 'PostToolUse' AND tool_name IN ('Grep', 'Glob', 'Edit') ORDER BY timestamp ASC"
+    ).all() as { session_id: string; tool_name: string }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      if (
+        rows[i].tool_name === 'Edit' &&
+        (rows[i - 1].tool_name === 'Grep' || rows[i - 1].tool_name === 'Glob') &&
+        rows[i].session_id === rows[i - 1].session_id
+      ) {
+        count++
+      }
+    }
+    return count
+  }
+
+  // ===================================================================
+  // NEW: Project Dedication queries
+  // ===================================================================
+
+  private queryMaxProjectSessions(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE project IS NOT NULL GROUP BY project ORDER BY c DESC LIMIT 1'
+    )
+  }
+
+  private queryMaxProjectsInDay(): number {
+    return this.queryScalar(
+      "SELECT COUNT(DISTINCT project) as c FROM sessions WHERE project IS NOT NULL GROUP BY strftime('%Y-%m-%d', started_at) ORDER BY c DESC LIMIT 1"
+    )
+  }
+
+  private queryFinishedProjects(): number {
+    // Projects that had a commit and then 7+ days of inactivity
+    const projectRows = this.db.prepare(
+      "SELECT DISTINCT project FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%git commit%' AND project IS NOT NULL"
+    ).all() as { project: string }[]
+
+    let count = 0
+    for (const pr of projectRows) {
+      const lastSession = this.db.prepare(
+        'SELECT MAX(started_at) as last FROM sessions WHERE project = ?'
+      ).get(pr.project) as { last: string | null } | undefined
+
+      if (lastSession?.last) {
+        const daysSince = (Date.now() - new Date(lastSession.last).getTime()) / (1000 * 60 * 60 * 24)
+        if (daysSince >= 7) count++
+      }
+    }
+    return count
+  }
+
+  private queryLegacyReturns(): number {
+    // Returns to a project after 30+ days of inactivity
+    const rows = this.db.prepare(
+      'SELECT project, started_at FROM sessions WHERE project IS NOT NULL ORDER BY project, started_at ASC'
+    ).all() as { project: string; started_at: string }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].project === rows[i - 1].project) {
+        const prev = new Date(rows[i - 1].started_at).getTime()
+        const curr = new Date(rows[i].started_at).getTime()
+        const diffDays = (curr - prev) / (1000 * 60 * 60 * 24)
+        if (diffDays >= 30) count++
+      }
+    }
+    return count
+  }
+
+  // ===================================================================
+  // NEW: Multi-Agent queries
+  // ===================================================================
+
+  private queryMaxConcurrentSubagents(): number {
+    // Simulate concurrent subagents by tracking start/stop events
+    const rows = this.db.prepare(
+      "SELECT hook_type, tool_input FROM events WHERE hook_type IN ('SubagentStart', 'SubagentStop') ORDER BY timestamp ASC"
+    ).all() as { hook_type: string; tool_input: string | null }[]
+
+    let current = 0
+    let max = 0
+    for (const row of rows) {
+      if (row.hook_type === 'SubagentStart') {
+        current++
+        max = Math.max(max, current)
+      } else {
+        current = Math.max(0, current - 1)
+      }
+    }
+    return max
+  }
+
+  private queryQuickSubagentStops(): number {
+    // Subagents stopped within 30 seconds of starting
+    const starts = this.db.prepare(
+      "SELECT tool_input, timestamp FROM events WHERE hook_type = 'SubagentStart'"
+    ).all() as { tool_input: string | null; timestamp: string }[]
+
+    const stops = this.db.prepare(
+      "SELECT tool_input, timestamp FROM events WHERE hook_type = 'SubagentStop'"
+    ).all() as { tool_input: string | null; timestamp: string }[]
+
+    let count = 0
+    for (const start of starts) {
+      if (!start.tool_input) continue
+      let agentId: string | null = null
+      try {
+        const parsed = JSON.parse(start.tool_input)
+        agentId = parsed.agent_id ?? null
+      } catch { continue }
+      if (!agentId) continue
+
+      for (const stop of stops) {
+        if (!stop.tool_input) continue
+        try {
+          const parsed = JSON.parse(stop.tool_input)
+          if (parsed.agent_id === agentId) {
+            const startTime = new Date(start.timestamp).getTime()
+            const stopTime = new Date(stop.timestamp).getTime()
+            if ((stopTime - startTime) < 30000) count++
+            break
+          }
+        } catch { continue }
+      }
+    }
+    return count
+  }
+
+  private queryMaxSubagentsInSession(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM events WHERE hook_type = 'SubagentStart' GROUP BY session_id ORDER BY c DESC LIMIT 1"
+    )
+  }
+
+  // ===================================================================
+  // NEW: Humor & Meta queries
+  // ===================================================================
+
+  private queryDejaVuCount(): number {
+    // Same prompt submitted twice within 5 minutes
+    const rows = this.db.prepare(
+      'SELECT LOWER(TRIM(content)) as content, timestamp FROM prompts ORDER BY timestamp ASC'
+    ).all() as { content: string; timestamp: string }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].content === rows[i - 1].content) {
+        const prev = new Date(rows[i - 1].timestamp).getTime()
+        const curr = new Date(rows[i].timestamp).getTime()
+        if ((curr - prev) < 300000) count++ // 5 minutes
+      }
+    }
+    return count
+  }
+
+  private queryTrustIssueCount(): number {
+    // Read immediately after Write on same file
+    const rows = this.db.prepare(
+      "SELECT tool_name, json_extract(tool_input, '$.file_path') as fp FROM events WHERE hook_type = 'PostToolUse' AND tool_name IN ('Write', 'Read') AND tool_input IS NOT NULL ORDER BY timestamp ASC"
+    ).all() as { tool_name: string; fp: string | null }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].tool_name === 'Read' && rows[i - 1].tool_name === 'Write' && rows[i].fp === rows[i - 1].fp && rows[i].fp) {
+        count++
+      }
+    }
+    return count
+  }
+
+  private queryBackseatDriverCount(): number {
+    // Prompts with numbered step-by-step instructions (e.g., "1." "2." "3.")
+    const rows = this.db.prepare(
+      'SELECT content FROM prompts WHERE char_count > 20'
+    ).all() as { content: string }[]
+
+    let count = 0
+    const stepPattern = /(?:^|\n)\s*\d+\.\s/
+    for (const row of rows) {
+      const matches = row.content.match(/(?:^|\n)\s*\d+\.\s/g)
+      if (matches && matches.length >= 3) count++
+    }
+    return count
+  }
+
+  private queryNegotiatorCount(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM prompts WHERE LOWER(content) LIKE '%try again%' OR LOWER(content) LIKE '%one more time%'"
+    )
+  }
+
+  private queryMaxConsecutivePermissions(): number {
+    const rows = this.db.prepare(
+      "SELECT hook_type FROM events WHERE hook_type IN ('PermissionRequest', 'PostToolUse', 'UserPromptSubmit') ORDER BY timestamp ASC"
+    ).all() as { hook_type: string }[]
+
+    let maxStreak = 0
+    let current = 0
+    for (const row of rows) {
+      if (row.hook_type === 'PermissionRequest') {
+        current++
+        maxStreak = Math.max(maxStreak, current)
+      } else {
+        current = 0
+      }
+    }
+    return maxStreak
+  }
+
+  private queryBashRetrySuccessCount(): number {
+    // Bash success after a previous Bash failure
+    const rows = this.db.prepare(
+      "SELECT hook_type FROM events WHERE tool_name = 'Bash' AND hook_type IN ('PostToolUse', 'PostToolUseFailure') ORDER BY timestamp ASC"
+    ).all() as { hook_type: string }[]
+
+    let count = 0
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i - 1].hook_type === 'PostToolUseFailure' && rows[i].hook_type === 'PostToolUse') {
+        count++
+      }
+    }
+    return count
+  }
+
+  // ===================================================================
+  // NEW: Secret queries
+  // ===================================================================
+
+  private queryEasterEggActivity(): number {
+    // Check for sessions on Easter, Valentine's Day, or Thanksgiving
+    // Valentine's Day: Feb 14, Thanksgiving: Nov 22-28 (Thursday, 4th week)
+    // We use a simplified check for key dates
+    const count = this.queryScalar(
+      "SELECT COUNT(*) as c FROM sessions WHERE strftime('%m-%d', started_at) IN ('02-14', '11-28', '11-27', '11-26', '11-25', '11-24', '11-23', '11-22') OR (strftime('%m', started_at) = '04' AND CAST(strftime('%d', started_at) AS INTEGER) BETWEEN 1 AND 25)"
+    )
+    return count > 0 ? 1 : 0
+  }
+
+  private queryFullMoonSession(): number {
+    // Check if any session falls on a full moon date
+    // Using lunar cycle calculation: known new moon = Jan 11, 2024
+    // Full moon is ~14.765 days after new moon, cycle is ~29.53059 days
+    const knownNewMoon = new Date('2024-01-11T11:57:00Z').getTime()
+    const lunarCycleMs = 29.53059 * 24 * 60 * 60 * 1000
+    const fullMoonOffsetMs = 14.765 * 24 * 60 * 60 * 1000
+    const oneDayMs = 24 * 60 * 60 * 1000
+
+    const rows = this.db.prepare(
+      'SELECT started_at FROM sessions'
+    ).all() as { started_at: string }[]
+
+    for (const row of rows) {
+      const sessionTime = new Date(row.started_at).getTime()
+      const timeSinceFullMoon = ((sessionTime - knownNewMoon - fullMoonOffsetMs) % lunarCycleMs + lunarCycleMs) % lunarCycleMs
+      // Within 1 day of a full moon
+      if (timeSinceFullMoon < oneDayMs || timeSinceFullMoon > lunarCycleMs - oneDayMs) {
+        return 1
+      }
+    }
+    return 0
+  }
+
+  private queryBirthdaySession(): number {
+    // Session on the anniversary of first session (same month-day, different year)
+    const first = this.db.prepare(
+      'SELECT started_at FROM sessions ORDER BY started_at ASC LIMIT 1'
+    ).get() as { started_at: string } | undefined
+
+    if (!first) return 0
+
+    const installMonthDay = first.started_at.slice(5, 10) // "MM-DD"
+    const installYear = first.started_at.slice(0, 4)
+
+    const anniversarySession = this.queryScalar(
+      "SELECT COUNT(*) as c FROM sessions WHERE strftime('%m-%d', started_at) = ? AND strftime('%Y', started_at) != ?",
+      installMonthDay, installYear
+    )
+    return anniversarySession > 0 ? 1 : 0
+  }
+
+  private queryGhostSessions(): number {
+    return this.queryScalar(
+      "SELECT COUNT(*) as c FROM sessions WHERE tool_count = 0 AND ended_at IS NOT NULL"
+    ) > 0 ? 1 : 0
+  }
+
+  private queryBullseyeSessions(): number {
+    // Session with exactly 1 prompt, 0 errors, and at least 1 tool call
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE prompt_count = 1 AND error_count = 0 AND tool_count > 0'
+    ) > 0 ? 1 : 0
+  }
+
+  // === Token Usage queries ===
+
+  private queryHeavyTokenSessions(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE (COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_creation_input_tokens, 0) + COALESCE(cache_read_input_tokens, 0)) >= 1000000'
+    )
+  }
+
+  private queryLightTokenSessions(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE (COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_creation_input_tokens, 0) + COALESCE(cache_read_input_tokens, 0)) > 0 AND (COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_creation_input_tokens, 0) + COALESCE(cache_read_input_tokens, 0)) < 50000 AND tool_count > 0'
+    )
+  }
+
+  private queryMaxOutputInSession(): number {
+    return this.queryScalar(
+      'SELECT COALESCE(MAX(output_tokens), 0) as c FROM sessions'
+    )
+  }
+
+  private queryHasTenMillionSession(): number {
+    return this.queryScalar(
+      'SELECT COUNT(*) as c FROM sessions WHERE (COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) + COALESCE(cache_creation_input_tokens, 0) + COALESCE(cache_read_input_tokens, 0)) >= 10000000'
+    ) > 0 ? 1 : 0
   }
 }

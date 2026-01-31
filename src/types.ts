@@ -207,6 +207,13 @@ export interface AllStats {
   projects: ProjectStats
 }
 
+export interface AgentBreakdown {
+  favoriteAgent: string
+  sessionsPerAgent: Record<string, number>
+  hoursPerAgent: Record<string, number>
+  distinctAgents: number
+}
+
 // === Agent Types ===
 
 export type AgentType =
@@ -233,11 +240,11 @@ export interface BadgeDefinition {
   name: string
   icon: string
   description: string
-  category: 'volume' | 'tool_mastery' | 'time' | 'behavioral' | 'resilience' | 'shipping' | 'multi_agent' | 'humor' | 'aspirational' | 'secret'
+  category: 'volume' | 'tool_mastery' | 'time' | 'behavioral' | 'resilience' | 'shipping' | 'multi_agent' | 'wild_card' | 'aspirational' | 'secret' | 'session_behavior' | 'prompt_patterns' | 'error_recovery' | 'tool_combos' | 'project_dedication' | 'token_usage'
   stat: string
   tiers: [number, number, number, number, number]
+  trigger: string
   secret?: boolean
-  humor?: boolean
   aspirational?: boolean
 }
 
@@ -255,13 +262,15 @@ export interface BadgeResult {
   nextThreshold: number
   progress: number
   maxed: boolean
+  trigger: string
   secret: boolean
   unlocked: boolean
 }
 
 export interface XPResult {
   totalXP: number
-  rank: string
+  rankNumber: number
+  rankTier: string
   nextRankXP: number
   progress: number
 }
@@ -278,5 +287,53 @@ export const TIER_NAMES: Record<BadgeTier, string> = {
   2: 'Silver',
   3: 'Gold',
   4: 'Diamond',
-  5: 'Obsidian',
+  5: 'Singularity',
+}
+
+// === Weekly Goals Types ===
+
+export interface WeeklyChallenge {
+  id: string
+  description: string
+  stat: string
+  threshold: number
+  xpReward: number
+  weekScoped: boolean
+}
+
+export interface WeeklyGoalRow {
+  week_start: string
+  challenge_id: string
+  completed: number
+  xp_reward: number
+}
+
+export interface WeeklyXPRow {
+  week_start: string
+  base_xp: number
+  multiplier: number
+  bonus_xp: number
+}
+
+export interface WeeklyGoalsPayload {
+  weekStart: string
+  daysActive: number
+  multiplier: number
+  challenges: Array<{
+    id: string
+    description: string
+    xpReward: number
+    completed: boolean
+    progress: number
+    threshold: number
+    current: number
+  }>
+}
+
+// === Rank Tier Bracket ===
+
+export interface RankTierBracket {
+  tier: string
+  minRank: number
+  maxRank: number
 }

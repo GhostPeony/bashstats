@@ -33,7 +33,6 @@ describe('parseToolArgs', () => {
 })
 
 describe('normalizeCopilotEvent', () => {
-  const originalPid = process.pid
   const mockDate = '2026-01-31'
 
   beforeEach(() => {

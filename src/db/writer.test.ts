@@ -57,7 +57,9 @@ describe('BashStatsWriter', () => {
     writer.recordSessionStart('sess-1', '/tmp', 'startup')
     writer.recordPrompt('sess-1', 'hello')
     writer.recordPrompt('sess-1', 'world')
-    const today = new Date().toISOString().slice(0, 10)
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     const activity = db.getDailyActivity(today)
     expect(activity!.prompts).toBe(2)
   })

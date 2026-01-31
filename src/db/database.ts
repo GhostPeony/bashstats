@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import type { EventRow, SessionRow, PromptRow, DailyActivityRow, AchievementUnlockRow } from '../types.js'
+import type { EventRow, SessionRow, PromptRow, DailyActivityRow, AchievementUnlockRow, TokenUsage } from '../types.js'
 
 function localNow(): string {
   const d = new Date()
@@ -33,7 +33,11 @@ CREATE TABLE IF NOT EXISTS sessions (
   tool_count INTEGER DEFAULT 0,
   error_count INTEGER DEFAULT 0,
   project TEXT,
-  duration_seconds INTEGER
+  duration_seconds INTEGER,
+  input_tokens INTEGER DEFAULT 0,
+  output_tokens INTEGER DEFAULT 0,
+  cache_creation_input_tokens INTEGER DEFAULT 0,
+  cache_read_input_tokens INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS prompts (
@@ -52,7 +56,11 @@ CREATE TABLE IF NOT EXISTS daily_activity (
   prompts INTEGER DEFAULT 0,
   tool_calls INTEGER DEFAULT 0,
   errors INTEGER DEFAULT 0,
-  duration_seconds INTEGER DEFAULT 0
+  duration_seconds INTEGER DEFAULT 0,
+  input_tokens INTEGER DEFAULT 0,
+  output_tokens INTEGER DEFAULT 0,
+  cache_creation_input_tokens INTEGER DEFAULT 0,
+  cache_read_input_tokens INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS achievement_unlocks (
@@ -90,10 +98,26 @@ export class BashStatsDB {
   }
 
   private migrate(): void {
-    const columns = this.db.pragma('table_info(sessions)') as { name: string }[]
-    const hasAgent = columns.some(c => c.name === 'agent')
-    if (!hasAgent) {
+    const sessionCols = this.db.pragma('table_info(sessions)') as { name: string }[]
+    const sessionColNames = new Set(sessionCols.map(c => c.name))
+
+    if (!sessionColNames.has('agent')) {
       this.db.exec("ALTER TABLE sessions ADD COLUMN agent TEXT NOT NULL DEFAULT 'claude-code'")
+    }
+
+    const tokenCols = ['input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens']
+    for (const col of tokenCols) {
+      if (!sessionColNames.has(col)) {
+        this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} INTEGER DEFAULT 0`)
+      }
+    }
+
+    const dailyCols = this.db.pragma('table_info(daily_activity)') as { name: string }[]
+    const dailyColNames = new Set(dailyCols.map(c => c.name))
+    for (const col of tokenCols) {
+      if (!dailyColNames.has(col)) {
+        this.db.exec(`ALTER TABLE daily_activity ADD COLUMN ${col} INTEGER DEFAULT 0`)
+      }
     }
   }
 
@@ -153,6 +177,12 @@ export class BashStatsDB {
     this.db.prepare(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...params)
   }
 
+  updateSessionTokens(id: string, tokens: TokenUsage): void {
+    this.db.prepare(`
+      UPDATE sessions SET input_tokens = ?, output_tokens = ?, cache_creation_input_tokens = ?, cache_read_input_tokens = ? WHERE id = ?
+    `).run(tokens.input_tokens, tokens.output_tokens, tokens.cache_creation_input_tokens, tokens.cache_read_input_tokens, id)
+  }
+
   incrementSessionCounters(id: string, counters: { prompts?: number; tools?: number; errors?: number }): void {
     const sets: string[] = []
     const params: unknown[] = []
@@ -179,16 +209,20 @@ export class BashStatsDB {
 
   // === Daily Activity ===
 
-  incrementDailyActivity(date: string, increments: { sessions?: number; prompts?: number; tool_calls?: number; errors?: number; duration_seconds?: number }): void {
+  incrementDailyActivity(date: string, increments: { sessions?: number; prompts?: number; tool_calls?: number; errors?: number; duration_seconds?: number; input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }): void {
     this.db.prepare(`
-      INSERT INTO daily_activity (date, sessions, prompts, tool_calls, errors, duration_seconds)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO daily_activity (date, sessions, prompts, tool_calls, errors, duration_seconds, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(date) DO UPDATE SET
         sessions = sessions + excluded.sessions,
         prompts = prompts + excluded.prompts,
         tool_calls = tool_calls + excluded.tool_calls,
         errors = errors + excluded.errors,
-        duration_seconds = duration_seconds + excluded.duration_seconds
+        duration_seconds = duration_seconds + excluded.duration_seconds,
+        input_tokens = input_tokens + excluded.input_tokens,
+        output_tokens = output_tokens + excluded.output_tokens,
+        cache_creation_input_tokens = cache_creation_input_tokens + excluded.cache_creation_input_tokens,
+        cache_read_input_tokens = cache_read_input_tokens + excluded.cache_read_input_tokens
     `).run(
       date,
       increments.sessions ?? 0,
@@ -196,6 +230,10 @@ export class BashStatsDB {
       increments.tool_calls ?? 0,
       increments.errors ?? 0,
       increments.duration_seconds ?? 0,
+      increments.input_tokens ?? 0,
+      increments.output_tokens ?? 0,
+      increments.cache_creation_input_tokens ?? 0,
+      increments.cache_read_input_tokens ?? 0,
     )
   }
 

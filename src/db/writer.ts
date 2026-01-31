@@ -1,4 +1,5 @@
 import { BashStatsDB } from './database.js'
+import type { TokenUsage } from '../types.js'
 import path from 'path'
 
 export class BashStatsWriter {
@@ -119,7 +120,7 @@ export class BashStatsWriter {
     })
   }
 
-  recordSessionEnd(sessionId: string, stopReason: string): void {
+  recordSessionEnd(sessionId: string, stopReason: string, tokens?: TokenUsage | null): void {
     const timestamp = this.now()
     const session = this.db.getSession(sessionId)
 
@@ -136,6 +137,10 @@ export class BashStatsWriter {
       duration_seconds: durationSeconds,
     })
 
+    if (tokens) {
+      this.db.updateSessionTokens(sessionId, tokens)
+    }
+
     this.db.insertEvent({
       session_id: sessionId,
       hook_type: 'Stop',
@@ -149,8 +154,18 @@ export class BashStatsWriter {
       timestamp,
     })
 
+    const dailyIncrements: Record<string, number> = {}
     if (durationSeconds !== undefined) {
-      this.db.incrementDailyActivity(this.today(), { duration_seconds: durationSeconds })
+      dailyIncrements.duration_seconds = durationSeconds
+    }
+    if (tokens) {
+      dailyIncrements.input_tokens = tokens.input_tokens
+      dailyIncrements.output_tokens = tokens.output_tokens
+      dailyIncrements.cache_creation_input_tokens = tokens.cache_creation_input_tokens
+      dailyIncrements.cache_read_input_tokens = tokens.cache_read_input_tokens
+    }
+    if (Object.keys(dailyIncrements).length > 0) {
+      this.db.incrementDailyActivity(this.today(), dailyIncrements)
     }
   }
 

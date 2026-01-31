@@ -802,7 +802,7 @@
 
     .session-item {
       display: grid;
-      grid-template-columns: 140px 1fr 100px 100px 100px;
+      grid-template-columns: 140px 1fr 100px 100px 100px 100px;
       gap: 12px;
       align-items: center;
       padding: 10px 14px;
@@ -1246,6 +1246,14 @@
       return (seconds / 3600).toFixed(1);
     }
 
+    function formatTokens(n) {
+      if (n == null || n === 0) return '0';
+      if (n >= 1000000000) return (n / 1000000000).toFixed(1) + 'B';
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return n.toLocaleString();
+    }
+
     function formatDate(dateStr) {
       const d = new Date(dateStr);
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -1407,7 +1415,7 @@
         { label: 'Prompts', value: formatNumber(lt.totalPrompts || 0), sub: 'messages sent' },
         { label: 'Tool Calls', value: formatNumber(lt.totalToolCalls || 0), sub: 'total invocations' },
         { label: 'Hours', value: formatHours(lt.totalDurationSeconds || 0), sub: 'coding time' },
-        { label: 'Files Read', value: formatNumber(lt.totalFilesRead || 0), sub: 'files accessed' },
+        { label: 'Tokens Used', value: formatTokens(lt.totalTokens || 0), sub: 'input + output' },
         { label: 'Bash Cmds', value: formatNumber(lt.totalBashCommands || lt.totalToolCalls || 0), sub: 'commands run' },
       ];
 
@@ -1440,7 +1448,7 @@
         <div class="stat-card"><div class="stat-card-label">Prompts</div><div class="stat-card-number mono">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Tool Calls</div><div class="stat-card-number mono">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Hours</div><div class="stat-card-number mono">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Files Read</div><div class="stat-card-number mono">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Tokens Used</div><div class="stat-card-number mono">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Bash Cmds</div><div class="stat-card-number mono">0</div></div>
       `;
     }
@@ -1610,17 +1618,20 @@
       const recent = sessions.slice(-20).reverse();
       el.innerHTML = `
         <div class="session-item" style="font-weight:600;background:var(--bg-accent);font-size:12px;">
-          <div>Date</div><div>Project</div><div style="text-align:right">Duration</div><div style="text-align:right">Prompts</div><div style="text-align:right">Tools</div>
+          <div>Date</div><div>Project</div><div style="text-align:right">Duration</div><div style="text-align:right">Prompts</div><div style="text-align:right">Tools</div><div style="text-align:right">Tokens</div>
         </div>
-        ${recent.map(s => `
+        ${recent.map(s => {
+          const sessionTokens = (s.input_tokens || 0) + (s.output_tokens || 0);
+          return `
           <div class="session-item">
             <div class="session-date">${escapeHtml(formatDateTime(s.start_time || s.startTime || s.started_at || ''))}</div>
             <div class="session-project">${escapeHtml(s.project || s.projectName || 'Unknown')}</div>
             <div class="session-stat">${formatDuration(s.duration_seconds || s.durationSeconds || 0)}</div>
             <div class="session-stat">${formatNumber(s.prompt_count || s.prompts || s.promptCount || 0)}</div>
             <div class="session-stat">${formatNumber(s.tool_count || s.tool_calls || s.toolCalls || 0)}</div>
+            <div class="session-stat">${formatTokens(sessionTokens)}</div>
           </div>
-        `).join('')}
+        `}).join('')}
       `;
     }
 
@@ -1656,6 +1667,16 @@
         ['Characters Typed', formatNumber(lt.totalCharsTyped)],
         ['Total Tool Calls', formatNumber(lt.totalToolCalls)],
         ['Files Read', formatNumber(lt.totalFilesRead)],
+      ]);
+
+      // Token Usage
+      html += buildStatsSection('Token Usage', [
+        ['Total Tokens', formatTokens((lt.totalInputTokens || 0) + (lt.totalOutputTokens || 0))],
+        ['Input Tokens', formatTokens(lt.totalInputTokens)],
+        ['Output Tokens', formatTokens(lt.totalOutputTokens)],
+        ['Cache Read Tokens', formatTokens(lt.totalCacheReadTokens)],
+        ['Cache Creation Tokens', formatTokens(lt.totalCacheCreationTokens)],
+        ['Avg Tokens / Session', formatTokens(lt.totalSessions ? Math.round(((lt.totalInputTokens || 0) + (lt.totalOutputTokens || 0)) / lt.totalSessions) : 0)],
       ]);
 
       // Tool Breakdown
@@ -1823,9 +1844,11 @@
         { label: 'Longest Session', value: formatDuration(sess.longestSessionSeconds), sub: 'personal best' },
         { label: 'Most Tools (Session)', value: formatNumber(sess.mostToolsInSession), sub: 'single session' },
         { label: 'Most Prompts (Session)', value: formatNumber(sess.mostPromptsInSession), sub: 'single session' },
+        { label: 'Most Tokens (Session)', value: formatTokens(sess.mostTokensInSession), sub: 'single session' },
         { label: 'Shortest Session', value: formatDuration(sess.shortestSessionSeconds), sub: 'speed run' },
         { label: 'Average Prompts', value: formatNumber(avgPrompts), sub: 'per session' },
         { label: 'Average Tools', value: formatNumber(avgTools), sub: 'per session' },
+        { label: 'Avg Tokens / Session', value: formatTokens(sess.avgTokensPerSession), sub: 'per session' },
         { label: 'Average Duration', value: formatDuration(avgDuration), sub: 'per session' },
         { label: 'Longest Streak', value: (time.longestStreak || 0) + ' days', sub: 'consecutive days' },
         { label: 'Peak Hour', value: time.peakHour != null ? time.peakHour + ':00' : 'N/A', sub: 'most active hour' },

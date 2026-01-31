@@ -62,6 +62,19 @@ export class StatsEngine {
     const totalRateLimits = this.queryScalar(
       "SELECT COUNT(*) as c FROM events WHERE hook_type = 'Notification' AND tool_input LIKE '%rate_limit%'"
     )
+    const totalInputTokens = this.queryScalar(
+      'SELECT COALESCE(SUM(input_tokens), 0) as c FROM sessions'
+    )
+    const totalOutputTokens = this.queryScalar(
+      'SELECT COALESCE(SUM(output_tokens), 0) as c FROM sessions'
+    )
+    const totalCacheCreationTokens = this.queryScalar(
+      'SELECT COALESCE(SUM(cache_creation_input_tokens), 0) as c FROM sessions'
+    )
+    const totalCacheReadTokens = this.queryScalar(
+      'SELECT COALESCE(SUM(cache_read_input_tokens), 0) as c FROM sessions'
+    )
+    const totalTokens = totalInputTokens + totalOutputTokens
 
     return {
       totalSessions,
@@ -80,6 +93,11 @@ export class StatsEngine {
       totalCompactions,
       totalErrors,
       totalRateLimits,
+      totalInputTokens,
+      totalOutputTokens,
+      totalCacheCreationTokens,
+      totalCacheReadTokens,
+      totalTokens,
     }
   }
 
@@ -237,6 +255,12 @@ export class StatsEngine {
     const avgToolsPerSession = this.queryScalar(
       'SELECT COALESCE(AVG(tool_count), 0) as c FROM sessions'
     )
+    const mostTokensInSession = this.queryScalar(
+      'SELECT COALESCE(MAX(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as c FROM sessions'
+    )
+    const avgTokensPerSession = this.queryScalar(
+      'SELECT COALESCE(AVG(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as c FROM sessions'
+    )
 
     return {
       longestSessionSeconds,
@@ -246,6 +270,8 @@ export class StatsEngine {
       avgDurationSeconds: Math.round(avgDurationSeconds),
       avgPromptsPerSession: Math.round(avgPromptsPerSession * 100) / 100,
       avgToolsPerSession: Math.round(avgToolsPerSession * 100) / 100,
+      mostTokensInSession,
+      avgTokensPerSession: Math.round(avgTokensPerSession),
     }
   }
 

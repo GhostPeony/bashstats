@@ -5,6 +5,7 @@ import { DATA_DIR, DB_FILENAME } from '../constants.js'
 import { BashStatsDB } from '../db/database.js'
 import { BashStatsWriter } from '../db/writer.js'
 import type { AgentType } from '../types.js'
+import { extractTokenUsage } from './transcript.js'
 
 /**
  * Detect which CLI agent is running based on environment variables and process context.
@@ -110,7 +111,10 @@ export async function handleHookEvent(hookType: string): Promise<void> {
       }
 
       case 'Stop': {
-        writer.recordSessionEnd(sessionId, 'stopped')
+        const rawPath = (event.transcript_path as string) ?? ''
+        const transcriptPath = rawPath && rawPath.endsWith('.jsonl') ? path.resolve(rawPath) : ''
+        const tokens = transcriptPath ? await extractTokenUsage(transcriptPath) : null
+        writer.recordSessionEnd(sessionId, 'stopped', tokens)
         break
       }
 

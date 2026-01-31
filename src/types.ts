@@ -66,6 +66,15 @@ export interface SetupInput extends HookInput {
   CLAUDE_ENV_FILE: string
 }
 
+// === Token Usage ===
+
+export interface TokenUsage {
+  input_tokens: number
+  output_tokens: number
+  cache_creation_input_tokens: number
+  cache_read_input_tokens: number
+}
+
 // === Database Row Types ===
 
 export interface EventRow {
@@ -93,6 +102,10 @@ export interface SessionRow {
   error_count: number
   project: string | null
   duration_seconds: number | null
+  input_tokens: number | null
+  output_tokens: number | null
+  cache_creation_input_tokens: number | null
+  cache_read_input_tokens: number | null
 }
 
 export interface PromptRow {
@@ -111,6 +124,10 @@ export interface DailyActivityRow {
   tool_calls: number
   errors: number
   duration_seconds: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_input_tokens: number
+  cache_read_input_tokens: number
 }
 
 export interface AchievementUnlockRow {
@@ -139,6 +156,11 @@ export interface LifetimeStats {
   totalCompactions: number
   totalErrors: number
   totalRateLimits: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  totalCacheCreationTokens: number
+  totalCacheReadTokens: number
+  totalTokens: number
 }
 
 export interface ToolBreakdown {
@@ -166,6 +188,8 @@ export interface SessionRecords {
   avgDurationSeconds: number
   avgPromptsPerSession: number
   avgToolsPerSession: number
+  mostTokensInSession: number
+  avgTokensPerSession: number
 }
 
 export interface ProjectStats {

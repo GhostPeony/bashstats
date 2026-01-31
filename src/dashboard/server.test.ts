@@ -82,4 +82,34 @@ describe('Dashboard Server', () => {
     expect(Array.isArray(res.body)).toBe(true)
     expect((res.body as any[]).length).toBe(1)
   })
+
+  it('should return agent breakdown', async () => {
+    const writer = new BashStatsWriter(db)
+    writer.recordSessionStart('s1', '/tmp', 'startup', 'claude-code')
+    writer.recordSessionStart('s2', '/tmp', 'startup', 'gemini-cli')
+    const res = await request(app, '/api/agents')
+    expect(res.status).toBe(200)
+    expect((res.body as any).distinctAgents).toBe(2)
+    expect((res.body as any).sessionsPerAgent).toBeDefined()
+    expect((res.body as any).sessionsPerAgent['claude-code']).toBe(1)
+    expect((res.body as any).sessionsPerAgent['gemini-cli']).toBe(1)
+  })
+
+  it('should filter sessions by agent', async () => {
+    const writer = new BashStatsWriter(db)
+    writer.recordSessionStart('s1', '/tmp', 'startup', 'claude-code')
+    writer.recordSessionStart('s2', '/tmp', 'startup', 'gemini-cli')
+    writer.recordSessionStart('s3', '/tmp', 'startup', 'claude-code')
+
+    const all = await request(app, '/api/sessions')
+    expect((all.body as any[]).length).toBe(3)
+
+    const filtered = await request(app, '/api/sessions?agent=claude-code')
+    expect(filtered.status).toBe(200)
+    expect(Array.isArray(filtered.body)).toBe(true)
+    expect((filtered.body as any[]).length).toBe(2)
+    for (const s of filtered.body as any[]) {
+      expect(s.agent).toBe('claude-code')
+    }
+  })
 })

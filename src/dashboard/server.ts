@@ -21,17 +21,19 @@ export function createApp(db: BashStatsDB): express.Express {
     res.json({ status: 'ok', version: '0.1.0' })
   })
 
-  app.get('/api/stats', (_req, res) => {
+  app.get('/api/stats', (req, res) => {
     try {
-      res.json(stats.getAllStats())
+      const agent = req.query.agent as string | undefined
+      res.json(stats.getAllStats(agent))
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch stats' })
     }
   })
 
-  app.get('/api/achievements', (_req, res) => {
+  app.get('/api/achievements', (req, res) => {
     try {
-      res.json(achievements.getAchievementsPayload())
+      const agent = req.query.agent as string | undefined
+      res.json(achievements.getAchievementsPayload(agent))
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch achievements' })
     }
@@ -46,12 +48,28 @@ export function createApp(db: BashStatsDB): express.Express {
     }
   })
 
-  app.get('/api/sessions', (_req, res) => {
+  app.get('/api/sessions', (req, res) => {
     try {
-      const sessions = db.prepare('SELECT * FROM sessions ORDER BY started_at DESC LIMIT 100').all()
+      const agent = req.query.agent as string | undefined
+      let sql = 'SELECT * FROM sessions'
+      const params: unknown[] = []
+      if (agent) {
+        sql += ' WHERE agent = ?'
+        params.push(agent)
+      }
+      sql += ' ORDER BY started_at DESC LIMIT 100'
+      const sessions = db.prepare(sql).all(...params)
       res.json(sessions)
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch sessions' })
+    }
+  })
+
+  app.get('/api/agents', (_req, res) => {
+    try {
+      res.json(stats.getAgentBreakdown())
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch agent breakdown' })
     }
   })
 

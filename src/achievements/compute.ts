@@ -19,8 +19,8 @@ export class AchievementEngine {
     this.stats = stats
   }
 
-  computeBadges(): BadgeResult[] {
-    const allStats = this.stats.getAllStats()
+  computeBadges(agent?: string): BadgeResult[] {
+    const allStats = this.stats.getAllStats(agent)
     const flat = this.flattenStats(allStats)
 
     return BADGE_DEFINITIONS.map(badge => {
@@ -98,9 +98,9 @@ export class AchievementEngine {
     })
   }
 
-  computeXP(): XPResult {
-    const allStats = this.stats.getAllStats()
-    const badges = this.computeBadges()
+  computeXP(agent?: string): XPResult {
+    const allStats = this.stats.getAllStats(agent)
+    const badges = this.computeBadges(agent)
 
     // Calculate XP from activity
     let totalXP = 0
@@ -149,12 +149,12 @@ export class AchievementEngine {
     }
   }
 
-  getAchievementsPayload(): AchievementsPayload {
-    const allStats = this.stats.getAllStats()
+  getAchievementsPayload(agent?: string): AchievementsPayload {
+    const allStats = this.stats.getAllStats(agent)
     return {
       stats: allStats,
-      badges: this.computeBadges(),
-      xp: this.computeXP(),
+      badges: this.computeBadges(agent),
+      xp: this.computeXP(agent),
     }
   }
 

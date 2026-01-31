@@ -26,7 +26,9 @@
       --tier-silver: #C0C0C0;
       --tier-gold: #FFD700;
       --tier-diamond: #B9F2FF;
-      --tier-obsidian: #2D1B69;
+      --tier-singularity: #2D1B69;
+      --tier-obsidian: #1a0a3e;
+      --tier-system-anomaly: #00ff41;
     }
 
     :root[data-theme="dark"] {
@@ -608,6 +610,17 @@
       line-height: 1.4;
     }
 
+    .badge-trigger {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+      line-height: 1.3;
+      padding: 3px 6px;
+      background: var(--bg-accent);
+      border-radius: 2px;
+      border-left: 2px solid var(--accent);
+    }
+
     .badge-progress-row {
       display: flex;
       align-items: center;
@@ -982,19 +995,19 @@
     }
 
     /* ===== TIER COLORS ===== */
-    .tier-locked   { color: var(--text-secondary); }
-    .tier-bronze   { color: var(--tier-bronze); }
-    .tier-silver   { color: var(--tier-silver); }
-    .tier-gold     { color: var(--tier-gold); }
-    .tier-diamond  { color: var(--tier-diamond); }
-    .tier-obsidian { color: var(--tier-obsidian); }
+    .tier-locked      { color: var(--text-secondary); }
+    .tier-bronze      { color: var(--tier-bronze); }
+    .tier-silver      { color: var(--tier-silver); }
+    .tier-gold        { color: var(--tier-gold); }
+    .tier-diamond     { color: var(--tier-diamond); }
+    .tier-singularity { color: var(--tier-singularity); }
 
-    .tier-bg-locked   { background: var(--text-secondary); }
-    .tier-bg-bronze   { background: var(--tier-bronze); }
-    .tier-bg-silver   { background: var(--tier-silver); }
-    .tier-bg-gold     { background: var(--tier-gold); }
-    .tier-bg-diamond  { background: var(--tier-diamond); }
-    .tier-bg-obsidian { background: var(--tier-obsidian); }
+    .tier-bg-locked      { background: var(--text-secondary); }
+    .tier-bg-bronze      { background: var(--tier-bronze); }
+    .tier-bg-silver      { background: var(--tier-silver); }
+    .tier-bg-gold        { background: var(--tier-gold); }
+    .tier-bg-diamond     { background: var(--tier-diamond); }
+    .tier-bg-singularity { background: var(--tier-singularity); }
 
     /* ===== REFRESH INDICATOR ===== */
     .refresh-indicator {
@@ -1009,6 +1022,75 @@
       border-radius: 2px;
       padding: 4px 8px;
       box-shadow: 3px 3px 0 var(--shadow);
+    }
+
+    .agent-filter {
+      background: var(--card-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+    }
+    .agent-filter:focus {
+      border-color: var(--accent);
+    }
+
+    .agent-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .agent-badge.claude-code { border-color: #d97706; color: #d97706; }
+    .agent-badge.gemini-cli { border-color: #4285f4; color: #4285f4; }
+    .agent-badge.copilot-cli { border-color: #6e40c9; color: #6e40c9; }
+    .agent-badge.opencode { border-color: #10b981; color: #10b981; }
+
+    .stat-na {
+      opacity: 0.4;
+      font-style: italic;
+    }
+
+    .agent-breakdown-card {
+      margin-top: 1rem;
+    }
+    .agent-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+    }
+    .agent-bar-label {
+      width: 100px;
+      font-size: 0.8rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .agent-bar-track {
+      flex: 1;
+      background: var(--border);
+      border-radius: 4px;
+      height: 20px;
+      overflow: hidden;
+    }
+    .agent-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      min-width: 3px;
+    }
+    .agent-bar-value {
+      font-size: 0.8rem;
+      width: 100px;
+      text-align: right;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -1025,12 +1107,13 @@
         </div>
       </div>
       <div class="header-right">
-        <div class="xp-bar-container" id="header-xp-container" style="display:none;">
-          <span class="xp-bar-label" id="header-xp-label">0 XP</span>
-          <div class="xp-bar-track">
-            <div class="xp-bar-fill" id="header-xp-fill" style="width:0%"></div>
-          </div>
-        </div>
+        <select id="agent-filter" class="agent-filter" title="Filter by agent">
+          <option value="">All Agents</option>
+          <option value="claude-code">Claude Code</option>
+          <option value="gemini-cli">Gemini CLI</option>
+          <option value="copilot-cli">Copilot CLI</option>
+          <option value="opencode">OpenCode</option>
+        </select>
         <div class="streak-display" id="header-streak" style="display:none;">
           <span id="streak-icon">&#128293;</span>
           <span id="streak-days">0d</span>
@@ -1070,6 +1153,8 @@
         </div>
         <!-- Stat cards -->
         <div class="stat-grid" id="overview-stat-cards"></div>
+        <!-- Agent breakdown -->
+        <div id="overview-agent-breakdown"></div>
         <!-- Sparkline -->
         <div class="sparkline-section card" id="overview-sparkline-card">
           <div class="card-title">30-Day Activity</div>
@@ -1186,6 +1271,9 @@
        =================================================================== */
 
     // ===== STATE =====
+    let selectedAgent = ''
+    let agentBreakdown = null
+
     const state = {
       stats: null,
       achievements: null,
@@ -1195,8 +1283,8 @@
     };
 
     // ===== TIER HELPERS =====
-    const TIER_NAMES = ['Locked', 'Bronze', 'Silver', 'Gold', 'Diamond', 'Obsidian'];
-    const TIER_CLASSES = ['locked', 'bronze', 'silver', 'gold', 'diamond', 'obsidian'];
+    const TIER_NAMES = ['Locked', 'Bronze', 'Silver', 'Gold', 'Diamond', 'Singularity'];
+    const TIER_CLASSES = ['locked', 'bronze', 'silver', 'gold', 'diamond', 'singularity'];
 
     function tierClass(tier) {
       return TIER_CLASSES[tier] || 'locked';
@@ -1209,20 +1297,21 @@
         'var(--tier-silver)',
         'var(--tier-gold)',
         'var(--tier-diamond)',
-        'var(--tier-obsidian)',
+        'var(--tier-singularity)',
       ];
       return colors[tier] || colors[0];
     }
 
-    function rankColor(rank) {
+    function rankColor(rankTier) {
       const map = {
         'Bronze': 'var(--tier-bronze)',
         'Silver': 'var(--tier-silver)',
         'Gold': 'var(--tier-gold)',
         'Diamond': 'var(--tier-diamond)',
         'Obsidian': 'var(--tier-obsidian)',
+        'System Anomaly': 'var(--tier-system-anomaly)',
       };
-      return map[rank] || 'var(--tier-bronze)';
+      return map[rankTier] || 'var(--tier-bronze)';
     }
 
     // ===== FORMAT HELPERS =====
@@ -1283,17 +1372,20 @@
     }
 
     async function loadAllData() {
-      const [stats, achievements, activity, sessions] = await Promise.all([
-        fetchJSON('/api/stats'),
-        fetchJSON('/api/achievements'),
-        fetchJSON('/api/activity'),
-        fetchJSON('/api/sessions'),
+      const agentParam = selectedAgent ? '?agent=' + selectedAgent : ''
+      const [stats, achievements, activity, sessions, agents] = await Promise.all([
+        fetchJSON('/api/stats' + agentParam),
+        fetchJSON('/api/achievements' + agentParam),
+        fetchJSON('/api/activity?days=365'),
+        fetchJSON('/api/sessions' + agentParam),
+        fetchJSON('/api/agents'),
       ]);
 
-      state.stats = stats;
-      state.achievements = achievements;
-      state.activity = activity;
-      state.sessions = sessions;
+      if (stats) state.stats = stats;
+      if (achievements) state.achievements = achievements;
+      if (activity) state.activity = activity;
+      if (sessions) state.sessions = sessions;
+      if (agents) agentBreakdown = agents;
       state.lastFetch = new Date();
 
       renderAll();
@@ -1322,6 +1414,14 @@
           if (target) target.classList.add('active');
         });
       });
+    }
+
+    // ===== AGENT FILTER =====
+    function setupAgentFilter() {
+      document.getElementById('agent-filter').addEventListener('change', (e) => {
+        selectedAgent = e.target.value
+        loadAllData()
+      })
     }
 
     // ===== THEME SWITCHING =====
@@ -1365,15 +1465,8 @@
         const rankDot = document.getElementById('header-rank-dot');
         const rankText = document.getElementById('header-rank-text');
         rankBadge.style.display = 'inline-flex';
-        rankDot.style.background = rankColor(xp.rank);
-        rankText.textContent = xp.rank;
-
-        const xpContainer = document.getElementById('header-xp-container');
-        const xpLabel = document.getElementById('header-xp-label');
-        const xpFill = document.getElementById('header-xp-fill');
-        xpContainer.style.display = 'flex';
-        xpLabel.textContent = formatNumber(xp.totalXP) + ' XP';
-        xpFill.style.width = Math.min(100, (xp.progress || 0) * 100) + '%';
+        rankDot.style.background = rankColor(xp.rankTier);
+        rankText.textContent = `Rank ${xp.rankNumber}`;
       }
 
       if (time) {
@@ -1415,7 +1508,7 @@
         { label: 'Prompts', value: formatNumber(lt.totalPrompts || 0), sub: 'messages sent' },
         { label: 'Tool Calls', value: formatNumber(lt.totalToolCalls || 0), sub: 'total invocations' },
         { label: 'Hours', value: formatHours(lt.totalDurationSeconds || 0), sub: 'coding time' },
-        { label: 'Tokens Used', value: formatTokens(lt.totalTokens || 0), sub: 'input + output' },
+        { label: 'Tokens Used', value: formatTokens(lt.totalTokens || 0), sub: 'all token types' },
         { label: 'Bash Cmds', value: formatNumber(lt.totalBashCommands || lt.totalToolCalls || 0), sub: 'commands run' },
       ];
 
@@ -1427,6 +1520,10 @@
           <div class="stat-card-sub">${escapeHtml(c.sub)}</div>
         </div>
       `).join('');
+
+      // Agent breakdown panel (only shown for "All Agents")
+      const breakdownEl = document.getElementById('overview-agent-breakdown');
+      if (breakdownEl) breakdownEl.innerHTML = renderAgentBreakdown();
 
       // Sparkline
       renderSparkline();
@@ -1465,7 +1562,7 @@
       for (let i = 29; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
         const found = activity.find(a => a.date === dateStr);
         const val = found ? (found.sessions + found.prompts + found.tool_calls) : 0;
         days.push({ date: dateStr, value: val });
@@ -1514,21 +1611,50 @@
       }
 
       const pct = Math.min(100, (xp.progress || 0) * 100);
-      const rc = rankColor(xp.rank);
-      const initial = xp.rank.charAt(0);
+      const rc = rankColor(xp.rankTier);
+      const rankNum = xp.rankNumber || 0;
       el.innerHTML = `
         <div class="rank-card-icon" style="border-color:${rc};background:${rc}22">
-          <span class="rank-card-icon-text" style="color:${rc}">${escapeHtml(initial)}</span>
+          <span class="rank-card-icon-text" style="color:${rc}">${rankNum}</span>
         </div>
         <div class="rank-card-info">
-          <div class="rank-card-rank" style="color:${rc}">${escapeHtml(xp.rank)}</div>
+          <div class="rank-card-rank" style="color:${rc}">Rank ${rankNum} &middot; ${escapeHtml(xp.rankTier)}</div>
           <div class="rank-card-xp">${formatNumber(xp.totalXP)} / ${formatNumber(xp.nextRankXP)} XP</div>
           <div class="rank-progress-track">
             <div class="rank-progress-fill" style="width:${pct}%;background:${rc}"></div>
           </div>
-          <div class="rank-progress-label">${pct.toFixed(1)}% to ${escapeHtml(xp.rank === 'Obsidian' ? 'max rank' : 'next rank')}</div>
+          <div class="rank-progress-label">${pct.toFixed(1)}% to ${escapeHtml(rankNum >= 500 ? 'System Anomaly' : 'Rank ' + (rankNum + 1))}</div>
         </div>
       `;
+    }
+
+    // ===== RENDER: AGENT BREAKDOWN =====
+    function renderAgentBreakdown() {
+      if (selectedAgent || !agentBreakdown || !agentBreakdown.sessionsPerAgent) return ''
+      const entries = Object.entries(agentBreakdown.sessionsPerAgent).sort(([,a], [,b]) => b - a)
+      if (entries.length <= 1) return ''
+      const maxSessions = Math.max(...entries.map(([,c]) => c), 1)
+      const agentColors = { 'claude-code': '#d97706', 'gemini-cli': '#4285f4', 'copilot-cli': '#6e40c9', 'opencode': '#10b981' }
+      const agentNames = { 'claude-code': 'Claude Code', 'gemini-cli': 'Gemini CLI', 'copilot-cli': 'Copilot CLI', 'opencode': 'OpenCode' }
+
+      const bars = entries.map(([agent, count]) => {
+        const pct = Math.round(count / maxSessions * 100)
+        const hours = agentBreakdown.hoursPerAgent[agent] ?? 0
+        const color = agentColors[agent] ?? 'var(--accent)'
+        const name = agentNames[agent] ?? agent
+        return '<div class="agent-bar">' +
+          '<span class="agent-bar-label">' + escapeHtml(name) + '</span>' +
+          '<div class="agent-bar-track"><div class="agent-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+          '<span class="agent-bar-value">' + count + ' / ' + hours + 'h</span>' +
+          '</div>'
+      }).join('')
+
+      const favName = agentNames[agentBreakdown.favoriteAgent] ?? agentBreakdown.favoriteAgent
+      return '<div class="card agent-breakdown-card">' +
+        '<h3>Agent Breakdown</h3>' +
+        '<p style="margin:0 0 8px;font-size:0.85rem">Favorite: <strong>' + escapeHtml(favName) + '</strong> &middot; ' + agentBreakdown.distinctAgents + ' agent' + (agentBreakdown.distinctAgents !== 1 ? 's' : '') + ' used</p>' +
+        bars +
+        '</div>'
     }
 
     // ===== RENDER: STATS =====
@@ -1621,11 +1747,12 @@
           <div>Date</div><div>Project</div><div style="text-align:right">Duration</div><div style="text-align:right">Prompts</div><div style="text-align:right">Tools</div><div style="text-align:right">Tokens</div>
         </div>
         ${recent.map(s => {
-          const sessionTokens = (s.input_tokens || 0) + (s.output_tokens || 0);
+          const sessionTokens = (s.input_tokens || 0) + (s.output_tokens || 0) + (s.cache_creation_input_tokens || 0) + (s.cache_read_input_tokens || 0);
+          const agentBadge = '<span class="agent-badge ' + (s.agent || 'claude-code') + '">' + escapeHtml(s.agent || 'claude-code') + '</span>';
           return `
           <div class="session-item">
             <div class="session-date">${escapeHtml(formatDateTime(s.start_time || s.startTime || s.started_at || ''))}</div>
-            <div class="session-project">${escapeHtml(s.project || s.projectName || 'Unknown')}</div>
+            <div class="session-project">${escapeHtml(s.project || s.projectName || 'Unknown')}${agentBadge}</div>
             <div class="session-stat">${formatDuration(s.duration_seconds || s.durationSeconds || 0)}</div>
             <div class="session-stat">${formatNumber(s.prompt_count || s.prompts || s.promptCount || 0)}</div>
             <div class="session-stat">${formatNumber(s.tool_count || s.tool_calls || s.toolCalls || 0)}</div>
@@ -1671,12 +1798,12 @@
 
       // Token Usage
       html += buildStatsSection('Token Usage', [
-        ['Total Tokens', formatTokens((lt.totalInputTokens || 0) + (lt.totalOutputTokens || 0))],
+        ['Total Tokens', formatTokens(lt.totalTokens || 0)],
         ['Input Tokens', formatTokens(lt.totalInputTokens)],
         ['Output Tokens', formatTokens(lt.totalOutputTokens)],
         ['Cache Read Tokens', formatTokens(lt.totalCacheReadTokens)],
         ['Cache Creation Tokens', formatTokens(lt.totalCacheCreationTokens)],
-        ['Avg Tokens / Session', formatTokens(lt.totalSessions ? Math.round(((lt.totalInputTokens || 0) + (lt.totalOutputTokens || 0)) / lt.totalSessions) : 0)],
+        ['Avg Tokens / Session', formatTokens(lt.totalSessions ? Math.round((lt.totalTokens || 0) / lt.totalSessions) : 0)],
       ]);
 
       // Tool Breakdown
@@ -1757,16 +1884,24 @@
       });
 
       let html = '';
-      const catOrder = ['volume', 'tools', 'streaks', 'time', 'exploration', 'humor', 'secret'];
+      const catOrder = ['volume', 'token_usage', 'tool_mastery', 'time', 'session_behavior', 'behavioral', 'prompt_patterns', 'resilience', 'error_recovery', 'tool_combos', 'shipping', 'project_dedication', 'multi_agent', 'wild_card', 'aspirational', 'secret'];
       const catNames = {
         volume: 'Volume',
-        tools: 'Tools',
-        streaks: 'Streaks',
-        time: 'Time',
-        exploration: 'Exploration',
-        humor: 'Humor',
+        token_usage: 'Token Usage',
+        tool_mastery: 'Tool Mastery',
+        time: 'Time & Patterns',
+        session_behavior: 'Session Behavior',
+        behavioral: 'Behavioral',
+        prompt_patterns: 'Prompt Patterns',
+        resilience: 'Resilience',
+        error_recovery: 'Error & Recovery',
+        tool_combos: 'Tool Combos',
+        shipping: 'Shipping & Projects',
+        project_dedication: 'Project Dedication',
+        multi_agent: 'Multi-Agent',
+        wild_card: 'Wild Card',
+        aspirational: 'Aspirational',
         secret: 'Secret',
-        general: 'General',
       };
 
       // Sort: known categories first, then others
@@ -1786,6 +1921,7 @@
           const cardClass = isSecretLocked ? 'badge-card secret-locked' : (isLocked ? 'badge-card locked' : 'badge-card');
           const displayName = isSecretLocked ? '???' : b.name;
           const displayDesc = isSecretLocked ? 'Unlock this secret badge to reveal it.' : (b.description || '');
+          const displayTrigger = isSecretLocked ? '' : (b.trigger || '');
           const pct = b.maxed ? 100 : Math.min(100, (b.progress || 0) * 100);
           const fillClass = b.maxed ? 'badge-progress-fill maxed' : 'badge-progress-fill';
 
@@ -1799,6 +1935,7 @@
                 <span class="badge-tier-label" style="color:${tierColor(b.tier)};border-color:${tierColor(b.tier)}">${escapeHtml(b.tierName || TIER_NAMES[b.tier] || 'Locked')}</span>
               </div>
               ${displayDesc ? `<div class="badge-description">${escapeHtml(displayDesc)}</div>` : ''}
+              ${displayTrigger ? `<div class="badge-trigger">${escapeHtml(displayTrigger)}</div>` : ''}
               <div class="badge-progress-row">
                 <div class="badge-progress-track">
                   <div class="${fillClass}" style="width:${pct}%"></div>
@@ -1896,6 +2033,7 @@
     // ===== INIT =====
     function init() {
       setupTabs();
+      setupAgentFilter();
       setupTheme();
       loadAllData();
       startAutoRefresh();

@@ -11,6 +11,21 @@ import type {
   WeeklyChallenge,
 } from '../types.js'
 
+export function parseGitDiffStats(toolOutputJson: string): { insertions: number; deletions: number } {
+  try {
+    const parsed = JSON.parse(toolOutputJson)
+    const stdout: string = parsed.stdout ?? ''
+    const match = stdout.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/)
+    if (!match) return { insertions: 0, deletions: 0 }
+    return {
+      insertions: parseInt(match[2] ?? '0', 10),
+      deletions: parseInt(match[3] ?? '0', 10),
+    }
+  } catch {
+    return { insertions: 0, deletions: 0 }
+  }
+}
+
 function localDateStr(d: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -116,6 +131,23 @@ export class StatsEngine {
     )
     const totalTokens = totalInputTokens + totalOutputTokens + totalCacheCreationTokens + totalCacheReadTokens
 
+    // Git commit & lines changed
+    const totalCommits = this.queryScalar(
+      "SELECT COUNT(*) as c FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%git commit%'" + ef.clause, ...ef.params
+    )
+    const commitOutputRows = this.db
+      .prepare(
+        "SELECT tool_output FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%git commit%' AND tool_output IS NOT NULL" + ef.clause
+      )
+      .all(...ef.params) as { tool_output: string }[]
+    let totalLinesAdded = 0
+    let totalLinesRemoved = 0
+    for (const row of commitOutputRows) {
+      const { insertions, deletions } = parseGitDiffStats(row.tool_output)
+      totalLinesAdded += insertions
+      totalLinesRemoved += deletions
+    }
+
     return {
       totalSessions,
       totalDurationSeconds,
@@ -138,6 +170,9 @@ export class StatsEngine {
       totalCacheCreationTokens,
       totalCacheReadTokens,
       totalTokens,
+      totalCommits,
+      totalLinesAdded,
+      totalLinesRemoved,
     }
   }
 

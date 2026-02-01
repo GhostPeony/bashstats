@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { StatsEngine } from './engine.js'
+import { StatsEngine, parseGitDiffStats } from './engine.js'
 import { BashStatsDB } from '../db/database.js'
 import { BashStatsWriter } from '../db/writer.js'
 import fs from 'fs'
@@ -201,6 +201,77 @@ describe('StatsEngine', () => {
 
       const breakdown = engine.getAgentBreakdown()
       expect(breakdown.hoursPerAgent['claude-code']).toBe(2)
+    })
+  })
+
+  describe('parseGitDiffStats', () => {
+    it('parses insertions and deletions', () => {
+      const output = JSON.stringify({ stdout: ' 3 files changed, 120 insertions(+), 45 deletions(-)' })
+      expect(parseGitDiffStats(output)).toEqual({ insertions: 120, deletions: 45 })
+    })
+
+    it('parses insertions only (no deletions)', () => {
+      const output = JSON.stringify({ stdout: ' 1 file changed, 10 insertions(+)' })
+      expect(parseGitDiffStats(output)).toEqual({ insertions: 10, deletions: 0 })
+    })
+
+    it('parses deletions only (no insertions)', () => {
+      const output = JSON.stringify({ stdout: ' 2 files changed, 5 deletions(-)' })
+      expect(parseGitDiffStats(output)).toEqual({ insertions: 0, deletions: 5 })
+    })
+
+    it('returns zeros for output with no diff summary', () => {
+      const output = JSON.stringify({ stdout: '[main abc1234] Initial commit\n' })
+      expect(parseGitDiffStats(output)).toEqual({ insertions: 0, deletions: 0 })
+    })
+
+    it('returns zeros for invalid JSON', () => {
+      expect(parseGitDiffStats('not json')).toEqual({ insertions: 0, deletions: 0 })
+    })
+  })
+
+  describe('git commit tracking in getLifetimeStats', () => {
+    it('counts commits and sums lines added/removed', () => {
+      writer.recordSessionStart('s1', '/proj', 'startup')
+      writer.recordToolUse(
+        's1', 'PostToolUse', 'Bash',
+        { command: 'git commit -m "feat: add feature"' },
+        { stdout: ' 3 files changed, 50 insertions(+), 10 deletions(-)' },
+        0, '/proj'
+      )
+      writer.recordToolUse(
+        's1', 'PostToolUse', 'Bash',
+        { command: 'git commit -m "fix: bug"' },
+        { stdout: ' 1 file changed, 5 insertions(+)' },
+        0, '/proj'
+      )
+
+      const stats = engine.getLifetimeStats()
+      expect(stats.totalCommits).toBe(2)
+      expect(stats.totalLinesAdded).toBe(55)
+      expect(stats.totalLinesRemoved).toBe(10)
+    })
+
+    it('handles commits with no diff summary (empty commit)', () => {
+      writer.recordSessionStart('s1', '/proj', 'startup')
+      writer.recordToolUse(
+        's1', 'PostToolUse', 'Bash',
+        { command: 'git commit --allow-empty -m "chore: empty"' },
+        { stdout: '[main abc1234] chore: empty\n' },
+        0, '/proj'
+      )
+
+      const stats = engine.getLifetimeStats()
+      expect(stats.totalCommits).toBe(1)
+      expect(stats.totalLinesAdded).toBe(0)
+      expect(stats.totalLinesRemoved).toBe(0)
+    })
+
+    it('returns zero commit stats for empty db', () => {
+      const stats = engine.getLifetimeStats()
+      expect(stats.totalCommits).toBe(0)
+      expect(stats.totalLinesAdded).toBe(0)
+      expect(stats.totalLinesRemoved).toBe(0)
     })
   })
 })

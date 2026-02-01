@@ -161,6 +161,9 @@ export interface LifetimeStats {
   totalCacheCreationTokens: number
   totalCacheReadTokens: number
   totalTokens: number
+  totalCommits: number
+  totalLinesAdded: number
+  totalLinesRemoved: number
 }
 
 export interface ToolBreakdown {

@@ -986,6 +986,48 @@
       text-align: right;
     }
 
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 12px;
+    }
+
+    .pagination-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      border: 2px solid var(--border);
+      border-radius: 2px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .pagination-btn:hover {
+      background: var(--bg-accent);
+    }
+
+    .pagination-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
     /* ===== SETTINGS TAB ===== */
     .settings-section {
       margin-bottom: 24px;
@@ -1559,6 +1601,7 @@
         <div class="card" style="margin-top:16px;">
           <div class="card-title">Recent Sessions</div>
           <div class="session-list" id="overview-sessions"></div>
+          <div class="pagination" id="sessions-pagination"></div>
         </div>
       </div>
     </div>
@@ -1672,6 +1715,9 @@
     let selectedAgent = ''
     let agentBreakdown = null
 
+    let sessionsPage = 1;
+    const SESSIONS_PER_PAGE = 10;
+
     const state = {
       stats: null,
       achievements: null,
@@ -1774,7 +1820,7 @@
       const agentParam = selectedAgent ? '?agent=' + selectedAgent : ''
       const [stats, achievements, activity, sessions, agents, weeklyGoals] = await Promise.all([
         fetchJSON('/api/stats' + agentParam),
-        fetchJSON('/api/achievements' + agentParam),
+        fetchJSON('/api/achievements'),
         fetchJSON('/api/activity?days=365'),
         fetchJSON('/api/sessions' + agentParam),
         fetchJSON('/api/agents'),
@@ -1904,14 +1950,13 @@
       content.style.display = 'block';
 
       const lt = state.stats.lifetime || {};
-      const filesTouched = (lt.totalFilesRead || 0) + (lt.totalFilesEdited || 0) + (lt.totalFilesCreated || 0);
       const cards = [
         { label: 'Sessions', value: formatNumber(lt.totalSessions || 0), sub: 'lifetime' },
         { label: 'Prompts', value: formatNumber(lt.totalPrompts || 0), sub: 'messages sent' },
         { label: 'Tool Calls', value: formatNumber(lt.totalToolCalls || 0), sub: 'total invocations' },
         { label: 'Hours', value: formatHours(lt.totalDurationSeconds || 0), sub: 'coding time' },
         { label: 'Tokens Used', value: formatTokens(lt.totalTokens || 0), sub: 'all token types' },
-        { label: 'Files Touched', value: formatNumber(filesTouched), sub: 'read + edit + create' },
+        { label: 'Lines Added', value: formatNumber(lt.totalLinesAdded || 0), sub: (lt.totalCommits || 0) + ' commits, ' + formatNumber(lt.totalLinesRemoved || 0) + ' removed' },
       ];
 
       const cardsEl = document.getElementById('overview-stat-cards');
@@ -1953,7 +1998,7 @@
         <div class="stat-card"><div class="stat-card-label">Tool Calls</div><div class="stat-card-number mono">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Hours</div><div class="stat-card-number mono">0</div></div>
         <div class="stat-card"><div class="stat-card-label">Tokens Used</div><div class="stat-card-number mono">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Files Touched</div><div class="stat-card-number mono">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Lines Added</div><div class="stat-card-number mono">0</div></div>
       `;
     }
 
@@ -2254,18 +2299,24 @@
 
     function renderOverviewSessions() {
       const el = document.getElementById('overview-sessions');
+      const pagEl = document.getElementById('sessions-pagination');
       if (!el) return;
       const sessions = state.sessions || [];
       if (sessions.length === 0) {
         el.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="empty-state-text">No sessions recorded</div></div>';
+        if (pagEl) pagEl.innerHTML = '';
         return;
       }
-      const recent = sessions.slice(-20).reverse();
+      const all = sessions.slice().reverse();
+      const totalPages = Math.ceil(all.length / SESSIONS_PER_PAGE);
+      if (sessionsPage > totalPages) sessionsPage = totalPages;
+      const start = (sessionsPage - 1) * SESSIONS_PER_PAGE;
+      const page = all.slice(start, start + SESSIONS_PER_PAGE);
       el.innerHTML = `
         <div class="session-item" style="font-weight:600;background:var(--bg-accent);font-size:12px;">
           <div>Date</div><div>Project</div><div style="text-align:right">Duration</div><div style="text-align:right">Prompts</div><div style="text-align:right">Tools</div><div style="text-align:right">Tokens</div>
         </div>
-        ${recent.map(s => {
+        ${page.map(s => {
           const sessionTokens = (s.input_tokens || 0) + (s.output_tokens || 0) + (s.cache_creation_input_tokens || 0) + (s.cache_read_input_tokens || 0);
           const agentBadge = '<span class="agent-badge ' + (s.agent || 'claude-code') + '">' + escapeHtml(s.agent || 'claude-code') + '</span>';
           return `
@@ -2279,6 +2330,21 @@
           </div>
         `}).join('')}
       `;
+      // Render pagination
+      if (pagEl) {
+        if (totalPages <= 1) { pagEl.innerHTML = ''; return; }
+        let btns = '<button class="pagination-btn" ' + (sessionsPage <= 1 ? 'disabled' : '') + ' onclick="goSessionsPage(' + (sessionsPage - 1) + ')">&laquo;</button>';
+        for (let i = 1; i <= totalPages; i++) {
+          btns += '<button class="pagination-btn' + (i === sessionsPage ? ' active' : '') + '" onclick="goSessionsPage(' + i + ')">' + i + '</button>';
+        }
+        btns += '<button class="pagination-btn" ' + (sessionsPage >= totalPages ? 'disabled' : '') + ' onclick="goSessionsPage(' + (sessionsPage + 1) + ')">&raquo;</button>';
+        pagEl.innerHTML = btns;
+      }
+    }
+
+    function goSessionsPage(p) {
+      sessionsPage = p;
+      renderOverviewSessions();
     }
 
     function renderStats() {
@@ -2313,6 +2379,16 @@
         ['Characters Typed', formatNumber(lt.totalCharsTyped)],
         ['Total Tool Calls', formatNumber(lt.totalToolCalls)],
         ['Files Read', formatNumber(lt.totalFilesRead)],
+      ]);
+
+      // Git & Shipping
+      const filesTouched = (lt.totalFilesRead || 0) + (lt.totalFilesEdited || 0) + (lt.totalFilesCreated || 0);
+      html += buildStatsSection('Git & Shipping', [
+        ['Total Commits', formatNumber(lt.totalCommits || 0)],
+        ['Lines Added', formatNumber(lt.totalLinesAdded || 0)],
+        ['Lines Removed', formatNumber(lt.totalLinesRemoved || 0)],
+        ['Net Lines', formatNumber((lt.totalLinesAdded || 0) - (lt.totalLinesRemoved || 0))],
+        ['Files Touched', formatNumber(filesTouched)],
       ]);
 
       // Token Usage

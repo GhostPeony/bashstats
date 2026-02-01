@@ -176,6 +176,8 @@ export class AchievementEngine {
     flat.totalWebFetches = allStats.lifetime.totalWebFetches
     flat.totalWebSearches = allStats.lifetime.totalWebSearches
     flat.totalCompactions = allStats.lifetime.totalCompactions
+    flat.totalLinesAdded = allStats.lifetime.totalLinesAdded
+    flat.totalLinesRemoved = allStats.lifetime.totalLinesRemoved
 
     // Derived
     flat.totalSessionHours = Math.floor(allStats.lifetime.totalDurationSeconds / 3600)

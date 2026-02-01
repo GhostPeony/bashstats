@@ -11,6 +11,7 @@ export default defineConfig([
     banner: {
       js: '#!/usr/bin/env node',
     },
+    onSuccess: 'npm run copy-static',
   },
   {
     entry: ['src/hooks/scripts/*.ts'],

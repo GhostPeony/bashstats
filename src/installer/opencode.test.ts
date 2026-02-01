@@ -224,7 +224,7 @@ describe('getOpenCodePluginContent', () => {
 
 describe('installOpenCode / uninstallOpenCode', () => {
   let tempDir: string
-  let origHome: string
+  let origHome: () => string
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bashstats-opencode-test-'))
@@ -307,7 +307,7 @@ describe('installOpenCode / uninstallOpenCode', () => {
 
 describe('isOpenCodeAvailable', () => {
   let tempDir: string
-  let origHome: string
+  let origHome: () => string
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bashstats-opencode-avail-'))

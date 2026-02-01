@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import type { EventRow, SessionRow, PromptRow, DailyActivityRow, AchievementUnlockRow, TokenUsage } from '../types.js'
+import type { EventRow, SessionRow, PromptRow, DailyActivityRow, AchievementUnlockRow, TokenUsage, WeeklyGoalRow, WeeklyXPRow } from '../types.js'
 
 function localNow(): string {
   const d = new Date()
@@ -74,6 +74,21 @@ CREATE TABLE IF NOT EXISTS achievement_unlocks (
 CREATE TABLE IF NOT EXISTS metadata (
   key TEXT PRIMARY KEY,
   value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS weekly_goals (
+  week_start TEXT NOT NULL,
+  challenge_id TEXT NOT NULL,
+  completed INTEGER DEFAULT 0,
+  xp_reward INTEGER NOT NULL,
+  PRIMARY KEY (week_start, challenge_id)
+);
+
+CREATE TABLE IF NOT EXISTS weekly_xp (
+  week_start TEXT PRIMARY KEY,
+  base_xp INTEGER DEFAULT 0,
+  multiplier REAL DEFAULT 1.0,
+  bonus_xp INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
@@ -277,6 +292,35 @@ export class BashStatsDB {
   getMetadata(key: string): string | null {
     const row = this.db.prepare('SELECT value FROM metadata WHERE key = ?').get(key) as { value: string } | undefined
     return row?.value ?? null
+  }
+
+  // === Weekly Goals ===
+
+  insertWeeklyGoal(weekStart: string, challengeId: string, xpReward: number): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO weekly_goals (week_start, challenge_id, xp_reward) VALUES (?, ?, ?)
+    `).run(weekStart, challengeId, xpReward)
+  }
+
+  completeWeeklyGoal(weekStart: string, challengeId: string): void {
+    this.db.prepare('UPDATE weekly_goals SET completed = 1 WHERE week_start = ? AND challenge_id = ?').run(weekStart, challengeId)
+  }
+
+  getWeeklyGoals(weekStart: string): WeeklyGoalRow[] {
+    return this.db.prepare('SELECT * FROM weekly_goals WHERE week_start = ?').all(weekStart) as WeeklyGoalRow[]
+  }
+
+  // === Weekly XP ===
+
+  upsertWeeklyXP(weekStart: string, baseXP: number, multiplier: number, bonusXP: number): void {
+    this.db.prepare(`
+      INSERT INTO weekly_xp (week_start, base_xp, multiplier, bonus_xp) VALUES (?, ?, ?, ?)
+      ON CONFLICT(week_start) DO UPDATE SET base_xp = ?, multiplier = ?, bonus_xp = ?
+    `).run(weekStart, baseXP, multiplier, bonusXP, baseXP, multiplier, bonusXP)
+  }
+
+  getWeeklyXP(weekStart: string): WeeklyXPRow | null {
+    return this.db.prepare('SELECT * FROM weekly_xp WHERE week_start = ?').get(weekStart) as WeeklyXPRow | null
   }
 
   // === Raw DB access for stats engine ===

@@ -1,4 +1,5 @@
 import { BashStatsDB } from '../db/database.js'
+import { WEEKLY_CHALLENGES, ACTIVITY_MULTIPLIERS } from '../constants.js'
 import type {
   LifetimeStats,
   ToolBreakdown,
@@ -6,11 +7,29 @@ import type {
   SessionRecords,
   ProjectStats,
   AllStats,
+  WeeklyGoalsPayload,
+  WeeklyChallenge,
 } from '../types.js'
 
 function localDateStr(d: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function selectWeekChallenges(weekStart: string): WeeklyChallenge[] {
+  let hash = 0
+  for (const c of weekStart) {
+    hash = ((hash * 31) + c.charCodeAt(0)) | 0
+  }
+  hash = Math.abs(hash)
+  const pool = [...WEEKLY_CHALLENGES]
+  const selected: WeeklyChallenge[] = []
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = hash % pool.length
+    selected.push(pool.splice(idx, 1)[0])
+    hash = Math.abs(((hash * 127) + 63) | 0)
+  }
+  return selected
 }
 
 export class StatsEngine {
@@ -355,6 +374,106 @@ export class StatsEngine {
       sessionsPerAgent,
       hoursPerAgent,
       distinctAgents: rows.length,
+    }
+  }
+
+  getWeeklyGoalsPayload(): WeeklyGoalsPayload {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+    const monday = new Date(today)
+    monday.setDate(monday.getDate() + mondayOffset)
+    const sunday = new Date(monday)
+    sunday.setDate(sunday.getDate() + 6)
+    const nextMonday = new Date(monday)
+    nextMonday.setDate(nextMonday.getDate() + 7)
+
+    const weekStart = localDateStr(monday)
+    const weekEnd = localDateStr(sunday)
+    const nextWeekStart = localDateStr(nextMonday)
+
+    const challenges = selectWeekChallenges(weekStart)
+
+    const daysActive = this.queryScalar<number>(
+      'SELECT COUNT(*) as c FROM daily_activity WHERE date >= ? AND date <= ? AND (sessions > 0 OR prompts > 0)',
+      weekStart, weekEnd
+    )
+
+    const multiplier = ACTIVITY_MULTIPLIERS[Math.min(7, Math.max(1, daysActive))] ?? 1.0
+
+    const results = challenges.map(c => {
+      const current = this.computeWeeklyStat(c.stat, weekStart, weekEnd, nextWeekStart)
+      return {
+        id: c.id,
+        description: c.description,
+        xpReward: c.xpReward,
+        completed: current >= c.threshold,
+        progress: Math.min(1, current / Math.max(1, c.threshold)),
+        threshold: c.threshold,
+        current,
+      }
+    })
+
+    return {
+      weekStart,
+      daysActive,
+      multiplier,
+      challenges: results,
+    }
+  }
+
+  private computeWeeklyStat(stat: string, weekStart: string, weekEnd: string, nextWeekStart: string): number {
+    switch (stat) {
+      case 'totalPrompts':
+        return this.queryScalar('SELECT COALESCE(SUM(prompts), 0) as c FROM daily_activity WHERE date >= ? AND date <= ?', weekStart, weekEnd)
+      case 'totalToolCalls':
+        return this.queryScalar('SELECT COALESCE(SUM(tool_calls), 0) as c FROM daily_activity WHERE date >= ? AND date <= ?', weekStart, weekEnd)
+      case 'totalSessions':
+        return this.queryScalar('SELECT COALESCE(SUM(sessions), 0) as c FROM daily_activity WHERE date >= ? AND date <= ?', weekStart, weekEnd)
+      case 'daysActive':
+        return this.queryScalar('SELECT COUNT(*) as c FROM daily_activity WHERE date >= ? AND date <= ? AND (sessions > 0 OR prompts > 0)', weekStart, weekEnd)
+      case 'totalHours': {
+        const secs = this.queryScalar('SELECT COALESCE(SUM(duration_seconds), 0) as c FROM daily_activity WHERE date >= ? AND date <= ?', weekStart, weekEnd)
+        return Math.round(secs / 3600 * 10) / 10
+      }
+      case 'totalFilesRead':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name = 'Read' AND hook_type = 'PostToolUse' AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'totalFilesEdited':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name = 'Edit' AND hook_type IN ('PostToolUse', 'PostToolUseFailure') AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'totalFilesCreated':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name = 'Write' AND hook_type IN ('PostToolUse', 'PostToolUseFailure') AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'totalBashCommands':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name = 'Bash' AND hook_type IN ('PostToolUse', 'PostToolUseFailure') AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'totalSearches':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name IN ('Grep', 'Glob') AND hook_type = 'PostToolUse' AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'totalCommits':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%git commit%' AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'totalPRs':
+        return this.queryScalar("SELECT COUNT(*) as c FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%gh pr create%' AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'commitDays':
+        return this.queryScalar("SELECT COUNT(DISTINCT substr(timestamp, 1, 10)) as c FROM events WHERE tool_name = 'Bash' AND hook_type = 'PostToolUse' AND tool_input LIKE '%git commit%' AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'longPromptCount':
+        return this.queryScalar('SELECT COUNT(*) as c FROM prompts WHERE char_count > 1000 AND timestamp >= ? AND timestamp < ?', weekStart, nextWeekStart)
+      case 'nightOwlDays':
+        return this.queryScalar("SELECT COUNT(DISTINCT substr(timestamp, 1, 10)) as c FROM prompts WHERE CAST(strftime('%H', timestamp) AS INTEGER) < 5 AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'earlyBirdDays':
+        return this.queryScalar("SELECT COUNT(DISTINCT substr(timestamp, 1, 10)) as c FROM prompts WHERE CAST(strftime('%H', timestamp) AS INTEGER) BETWEEN 5 AND 7 AND timestamp >= ? AND timestamp < ?", weekStart, nextWeekStart)
+      case 'weekendDays':
+        return this.queryScalar("SELECT COUNT(*) as c FROM daily_activity WHERE date >= ? AND date <= ? AND (sessions > 0 OR prompts > 0) AND CAST(strftime('%w', date) AS INTEGER) IN (0, 6)", weekStart, weekEnd)
+      case 'uniqueProjects':
+        return this.queryScalar('SELECT COUNT(DISTINCT project) as c FROM sessions WHERE project IS NOT NULL AND started_at >= ? AND started_at < ?', weekStart, nextWeekStart)
+      case 'cleanSessions':
+        return this.queryScalar('SELECT COUNT(*) as c FROM sessions WHERE error_count = 0 AND tool_count > 0 AND started_at >= ? AND started_at < ?', weekStart, nextWeekStart)
+      case 'extendedSessionCount':
+        return this.queryScalar('SELECT COUNT(*) as c FROM sessions WHERE duration_seconds > 3600 AND prompt_count >= 15 AND started_at >= ? AND started_at < ?', weekStart, nextWeekStart)
+      case 'quickDrawSessions':
+        return this.queryScalar('SELECT COUNT(*) as c FROM sessions WHERE duration_seconds IS NOT NULL AND duration_seconds < 120 AND tool_count > 0 AND started_at >= ? AND started_at < ?', weekStart, nextWeekStart)
+      case 'diverseToolSessions':
+        return this.queryScalar("SELECT COUNT(*) as c FROM (SELECT session_id FROM events WHERE hook_type = 'PostToolUse' AND tool_name IS NOT NULL AND session_id IN (SELECT id FROM sessions WHERE started_at >= ? AND started_at < ?) GROUP BY session_id HAVING COUNT(DISTINCT tool_name) >= 5)", weekStart, nextWeekStart)
+      case 'maxSubagentsInSession':
+        return this.queryScalar("SELECT COALESCE(MAX(cnt), 0) as c FROM (SELECT COUNT(*) as cnt FROM events WHERE hook_type = 'SubagentStart' AND session_id IN (SELECT id FROM sessions WHERE started_at >= ? AND started_at < ?) GROUP BY session_id)", weekStart, nextWeekStart)
+      default:
+        return 0
     }
   }
 }

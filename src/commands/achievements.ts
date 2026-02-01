@@ -35,7 +35,7 @@ export function runAchievements(): void {
     // Header
     console.log('')
     console.log(`  bashstats - Achievements`)
-    console.log(`  Rank: ${payload.xp.rank}    XP: ${payload.xp.totalXP.toLocaleString()} / ${payload.xp.nextRankXP.toLocaleString()}`)
+    console.log(`  Rank ${payload.xp.rankNumber} [${payload.xp.rankTier}]    XP: ${payload.xp.totalXP.toLocaleString()} / ${payload.xp.nextRankXP.toLocaleString()}`)
     console.log(`  ${progressBar(payload.xp.progress, 40)}  ${Math.round(payload.xp.progress * 100)}%`)
     console.log('')
 
@@ -52,12 +52,18 @@ export function runAchievements(): void {
     const categoryNames: Record<string, string> = {
       volume: 'VOLUME',
       tool_mastery: 'TOOL MASTERY',
-      time: 'TIME & STREAKS',
+      time: 'TIME & PATTERNS',
+      session_behavior: 'SESSION BEHAVIOR',
       behavioral: 'BEHAVIORAL',
+      prompt_patterns: 'PROMPT PATTERNS',
       resilience: 'RESILIENCE',
+      error_recovery: 'ERROR & RECOVERY',
+      tool_combos: 'TOOL COMBOS',
       shipping: 'SHIPPING & PROJECTS',
+      project_dedication: 'PROJECT DEDICATION',
       multi_agent: 'MULTI-AGENT',
-      humor: 'HUMOR',
+      wild_card: 'WILD CARD',
+      token_usage: 'TOKEN USAGE',
       aspirational: 'ASPIRATIONAL',
       secret: 'SECRET',
     }
@@ -70,7 +76,7 @@ export function runAchievements(): void {
         const value = badge.value.toLocaleString()
         const next = badge.maxed ? '' : ` / ${badge.nextThreshold.toLocaleString()}`
         console.log(`    ${tier.padEnd(12)} ${badge.name.padEnd(22)} ${value}${next}${bar}`)
-        if (badge.description && (badge.category === 'humor' || badge.category === 'secret')) {
+        if (badge.description && (badge.category === 'wild_card' || badge.category === 'secret')) {
           console.log(`               "${badge.description}"`)
         }
       }

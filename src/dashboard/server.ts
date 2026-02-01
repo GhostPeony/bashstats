@@ -65,6 +65,14 @@ export function createApp(db: BashStatsDB): express.Express {
     }
   })
 
+  app.get('/api/weekly-goals', (_req, res) => {
+    try {
+      res.json(stats.getWeeklyGoalsPayload())
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch weekly goals' })
+    }
+  })
+
   app.get('/api/agents', (_req, res) => {
     try {
       res.json(stats.getAgentBreakdown())

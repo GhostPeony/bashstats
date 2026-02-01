@@ -31,11 +31,12 @@ export function runStreak(): void {
       console.log('  Last 30 days:')
       const dates = new Set(daily.map(d => d.date))
       const today = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
       let line = '  '
       for (let i = 29; i >= 0; i--) {
         const d = new Date(today)
         d.setDate(d.getDate() - i)
-        const dateStr = d.toISOString().slice(0, 10)
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
         line += dates.has(dateStr) ? '#' : '.'
       }
       console.log(line)

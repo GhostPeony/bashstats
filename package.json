@@ -1,6 +1,6 @@
 {
   "name": "bashstats",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Obsessive stat tracking, achievements, and badges for Claude Code users",
   "type": "module",
   "main": "dist/index.js",

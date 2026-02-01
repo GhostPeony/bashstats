@@ -1,5 +1,5 @@
 # bashstats
-<img alt="bashstats dashboard" src="docs/dashboard.png" />
+<img alt="bashstats dashboard" src="https://raw.githubusercontent.com/GhostPeony/bashstats/main/docs/dashboard.png" />
 
 Track every prompt, tool call, and late-night coding session. Earn badges. Build streaks. Climb 500 ranks from Bronze to System Anomaly.
 

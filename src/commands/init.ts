@@ -46,6 +46,9 @@ export function runInit(): void {
   console.log('  [SECRET ACHIEVEMENT UNLOCKED] Launch Day')
   console.log('  "Welcome to bashstats. Your stats are now being watched. Forever."')
   console.log('')
+  console.log('  Want a public profile and global leaderboard ranking?')
+  console.log('  Run "bashstats login" to sign in with GitHub at bashstats.com')
+  console.log('')
   console.log('  Opening dashboard...')
   console.log('')
 

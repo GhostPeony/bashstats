@@ -13,7 +13,7 @@ npm install -g bashstats
 bashstats init
 ```
 
-`bashstats init` installs Claude Code hooks and creates the local database at `~/.bashstats/bashstats.db`. Stats begin recording immediately.
+`bashstats init` installs Claude Code hooks, registers the MCP server, and creates the local database at `~/.bashstats/bashstats.db`. Stats begin recording immediately.
 
 ## CLI Commands
 
@@ -261,6 +261,20 @@ All agents share the same `~/.bashstats/bashstats.db` database. The dashboard ag
 - **OpenCode** - Plugin installed at `~/.config/opencode/plugins/bashstats.ts`
 
 `bashstats uninstall` removes hooks from all agents.
+
+## MCP Server
+
+`bashstats init` registers an MCP server so Claude Code can access your stats directly during conversations — no shell commands needed. Ask things like "what are my stats?", "what badges am I close to?", or "how are my weekly goals?".
+
+Three tools are exposed:
+
+| Tool | What it returns |
+|------|----------------|
+| `bashstats_overview` | Rank, XP, streak, lifetime totals, today's activity, tokens |
+| `bashstats_achievements` | Unlocked badge count, closest to unlock, recent unlocks |
+| `bashstats_goals` | Weekly challenge progress, days active, multiplier |
+
+The server is registered in `~/.claude.json` and runs via stdio. `bashstats uninstall` removes it.
 
 ## Data Storage
 

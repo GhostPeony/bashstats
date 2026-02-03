@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "bashstats": "dist/cli.js"
+    "bashstats": "dist/cli.js",
+    "bashstats-mcp": "dist/mcp-server.js"
   },
   "scripts": {
     "build": "tsup && npm run copy-static",
@@ -30,9 +31,11 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "better-sqlite3": "^12.6.2",
     "commander": "^14.0.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

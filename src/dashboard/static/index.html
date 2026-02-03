@@ -1166,15 +1166,122 @@
       .badge-grid {
         grid-template-columns: 1fr;
       }
+      .records-grid {
+        grid-template-columns: 1fr;
+      }
+      .stats-grid-layout {
+        grid-template-columns: 1fr;
+      }
+      .agent-bar-label {
+        width: 80px;
+        font-size: 0.75rem;
+      }
+      .agent-bar-value {
+        width: 70px;
+        font-size: 0.75rem;
+      }
     }
 
     @media (max-width: 480px) {
+      .container {
+        padding: 0 10px;
+      }
       .stat-grid {
         grid-template-columns: 1fr;
       }
+      .stat-card {
+        padding: 14px;
+        box-shadow: 4px 4px 0 var(--shadow);
+      }
+      .stat-card-number {
+        font-size: 24px;
+      }
       .tab-btn {
-        padding: 10px 16px;
-        font-size: 13px;
+        padding: 10px 14px;
+        font-size: 12px;
+      }
+      .card {
+        padding: 14px;
+        box-shadow: 4px 4px 0 var(--shadow);
+      }
+      .header-title {
+        font-size: 18px;
+      }
+      .rank-badge {
+        font-size: 11px;
+        padding: 3px 8px;
+      }
+      .xp-bar-track {
+        width: 100px;
+      }
+      .session-item {
+        grid-template-columns: 1fr;
+        gap: 4px;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+      .session-date {
+        grid-column: auto;
+      }
+      .session-stat {
+        text-align: left;
+        font-size: 11px;
+      }
+      .session-project {
+        white-space: normal;
+      }
+      .record-value {
+        font-size: 22px;
+      }
+      .today-streak-number {
+        font-size: 28px;
+      }
+      .badge-progress-count {
+        font-size: 22px;
+      }
+      .recent-badge-tile {
+        width: 64px;
+        height: 64px;
+      }
+      .recent-badge-tile .badge-tile-icon {
+        font-size: 22px;
+      }
+      .recent-badge-tile .badge-tile-name {
+        font-size: 8px;
+      }
+      .settings-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .agent-bar-label {
+        width: 60px;
+        font-size: 0.7rem;
+      }
+      .agent-bar-value {
+        width: 50px;
+        font-size: 0.7rem;
+      }
+      .heatmap-cell {
+        width: 10px;
+        height: 10px;
+      }
+      .heatmap-day-label {
+        height: 10px;
+        font-size: 7px;
+        width: 18px;
+      }
+      .heatmap-legend-cell {
+        width: 10px;
+        height: 10px;
+      }
+      .heatmap-months {
+        padding-left: 22px;
+        font-size: 8px;
+      }
+      .heatmap-legend {
+        padding-left: 22px;
+        font-size: 8px;
       }
     }
 
@@ -1711,6 +1818,9 @@
        bashstats Dashboard - Single Page Application
        =================================================================== */
 
+    // ===== EMBEDDED DATA MODE =====
+    const __EMBEDDED_DATA__ = window.__BASHSTATS_DATA__ || null;
+
     // ===== STATE =====
     let selectedAgent = ''
     let agentBreakdown = null
@@ -1817,6 +1927,20 @@
     }
 
     async function loadAllData() {
+      // Embedded mode: use injected data, skip API calls
+      if (__EMBEDDED_DATA__) {
+        state.stats = __EMBEDDED_DATA__.stats;
+        state.achievements = __EMBEDDED_DATA__.achievements;
+        state.activity = __EMBEDDED_DATA__.activity;
+        state.sessions = __EMBEDDED_DATA__.sessions;
+        state.weeklyGoals = __EMBEDDED_DATA__.weeklyGoals;
+        agentBreakdown = __EMBEDDED_DATA__.agents;
+        state.lastFetch = new Date(__EMBEDDED_DATA__.uploaded_at);
+        renderAll();
+        updateRefreshIndicator();
+        return;
+      }
+
       const agentParam = selectedAgent ? '?agent=' + selectedAgent : ''
       const [stats, achievements, activity, sessions, agents, weeklyGoals] = await Promise.all([
         fetchJSON('/api/stats' + agentParam),
@@ -2720,6 +2844,7 @@
 
     // ===== AUTO-REFRESH =====
     function startAutoRefresh() {
+      if (__EMBEDDED_DATA__) return; // No auto-refresh in embedded mode
       setInterval(() => {
         loadAllData();
       }, 30000);
@@ -2727,6 +2852,16 @@
 
     // ===== INIT =====
     function init() {
+      // Hide settings tab and agent filter in embedded mode
+      if (__EMBEDDED_DATA__) {
+        const settingsBtn = document.querySelector('[data-tab="settings"]');
+        if (settingsBtn) settingsBtn.style.display = 'none';
+        const settingsTab = document.getElementById('tab-settings');
+        if (settingsTab) settingsTab.style.display = 'none';
+        const agentFilter = document.getElementById('agent-filter');
+        if (agentFilter) agentFilter.closest('.header-controls')?.querySelector('.agent-filter-wrapper')?.remove();
+      }
+
       setupTabs();
       setupAgentFilter();
       setupTheme();

@@ -7,6 +7,9 @@ import { runStreak } from './commands/streak.js'
 import { runExport } from './commands/export-data.js'
 import { runReset } from './commands/reset.js'
 import { runUninstall } from './commands/uninstall.js'
+import { runLogin } from './commands/login.js'
+import { runLogout } from './commands/logout.js'
+import { runShare } from './commands/share.js'
 import { DEFAULT_PORT } from './constants.js'
 
 const program = new Command()
@@ -28,6 +31,9 @@ program.command('streak').description('Show current and longest streak').action(
 program.command('export').description('Export all data as JSON').action(runExport)
 program.command('reset').description('Wipe all data').action(runReset)
 program.command('uninstall').description('Remove hooks and data').action(runUninstall)
+program.command('login').description('Sign in with GitHub to sync stats').action(runLogin)
+program.command('logout').description('Sign out and stop syncing').action(runLogout)
+program.command('share').description('Upload stats to bashstats.com').action(runShare)
 
 program.action(() => {
   console.log('bashstats - Obsessive stat tracking for Claude Code')

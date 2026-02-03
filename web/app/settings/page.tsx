@@ -38,6 +38,7 @@ export default async function SettingsPage() {
         isPublic={user.is_public}
         showOnLeaderboard={user.show_on_leaderboard}
         anonymousDisplay={user.anonymous_display}
+        hideProjects={user.hide_projects}
         lastUploadAt={user.last_upload_at}
       />
     </main>

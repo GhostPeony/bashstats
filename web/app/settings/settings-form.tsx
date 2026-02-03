@@ -13,6 +13,7 @@ interface SettingsFormProps {
   isPublic: boolean
   showOnLeaderboard: boolean
   anonymousDisplay: boolean
+  hideProjects: boolean
   lastUploadAt: string | null
 }
 
@@ -26,6 +27,7 @@ export default function SettingsForm(props: SettingsFormProps) {
   const [isPublic, setIsPublic] = useState(props.isPublic)
   const [showOnLeaderboard, setShowOnLeaderboard] = useState(props.showOnLeaderboard)
   const [anonymousDisplay, setAnonymousDisplay] = useState(props.anonymousDisplay)
+  const [hideProjects, setHideProjects] = useState(props.hideProjects)
 
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -54,6 +56,7 @@ export default function SettingsForm(props: SettingsFormProps) {
           is_public: isPublic,
           show_on_leaderboard: showOnLeaderboard,
           anonymous_display: anonymousDisplay,
+          hide_projects: hideProjects,
         }),
       })
       if (!res.ok) throw new Error('Failed to save')
@@ -231,6 +234,16 @@ export default function SettingsForm(props: SettingsFormProps) {
           </div>
           <label className="toggle-switch">
             <input type="checkbox" checked={anonymousDisplay} onChange={(e) => setAnonymousDisplay(e.target.checked)} />
+            <span className="toggle-slider" />
+          </label>
+        </div>
+        <div className="settings-toggle-row">
+          <div>
+            <div className="settings-toggle-label">Hide project names</div>
+            <div className="settings-toggle-desc">Project names in recent sessions and stats are hidden on your public profile.</div>
+          </div>
+          <label className="toggle-switch">
+            <input type="checkbox" checked={hideProjects} onChange={(e) => setHideProjects(e.target.checked)} />
             <span className="toggle-slider" />
           </label>
         </div>

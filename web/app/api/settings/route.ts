@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
   const isPublic = typeof body.is_public === 'boolean' ? body.is_public : user.is_public
   const showOnLeaderboard = typeof body.show_on_leaderboard === 'boolean' ? body.show_on_leaderboard : user.show_on_leaderboard
   const anonymousDisplay = typeof body.anonymous_display === 'boolean' ? body.anonymous_display : user.anonymous_display
+  const hideProjects = typeof body.hide_projects === 'boolean' ? body.hide_projects : user.hide_projects
 
   await updateUserProfile(user.id, {
     displayName: displayName || null,
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
     isPublic,
     showOnLeaderboard,
     anonymousDisplay,
+    hideProjects,
   })
 
   trackEvent('settings_update', user.id)

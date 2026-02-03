@@ -130,9 +130,59 @@ export default async function ProfilePage({ params }: Props) {
     )
   }
 
+  // Scrub project names if user opted to hide them
+  let snapshot = user.snapshot as Record<string, unknown>
+  if (user.hide_projects && snapshot) {
+    snapshot = JSON.parse(JSON.stringify(snapshot))
+    // Redact project names from recent sessions
+    const sessions = snapshot.sessions as Array<Record<string, unknown>> | undefined
+    if (Array.isArray(sessions)) {
+      for (const s of sessions) {
+        if (s.project) s.project = 'Hidden'
+      }
+    }
+    // Redact project stats
+    const stats = snapshot.stats as Record<string, unknown> | undefined
+    if (stats) {
+      const projects = stats.projects as Record<string, unknown> | undefined
+      if (projects) {
+        if (projects.mostVisitedProject) projects.mostVisitedProject = 'Hidden'
+        if (projects.projectBreakdown && typeof projects.projectBreakdown === 'object') {
+          const breakdown = projects.projectBreakdown as Record<string, number>
+          const redacted: Record<string, number> = {}
+          let i = 1
+          for (const key of Object.keys(breakdown)) {
+            redacted[`Project ${i++}`] = breakdown[key]
+          }
+          projects.projectBreakdown = redacted
+        }
+      }
+    }
+    // Also redact inside achievements.stats.projects if present
+    const achievements = snapshot.achievements as Record<string, unknown> | undefined
+    if (achievements) {
+      const achStats = achievements.stats as Record<string, unknown> | undefined
+      if (achStats) {
+        const achProjects = achStats.projects as Record<string, unknown> | undefined
+        if (achProjects) {
+          if (achProjects.mostVisitedProject) achProjects.mostVisitedProject = 'Hidden'
+          if (achProjects.projectBreakdown && typeof achProjects.projectBreakdown === 'object') {
+            const breakdown = achProjects.projectBreakdown as Record<string, number>
+            const redacted: Record<string, number> = {}
+            let i = 1
+            for (const key of Object.keys(breakdown)) {
+              redacted[`Project ${i++}`] = breakdown[key]
+            }
+            achProjects.projectBreakdown = redacted
+          }
+        }
+      }
+    }
+  }
+
   // Inject the snapshot data before </head>
   // Escape </script> sequences in JSON to prevent XSS breakout
-  const safeJson = JSON.stringify(user.snapshot).replace(/</g, '\\u003c')
+  const safeJson = JSON.stringify(snapshot).replace(/</g, '\\u003c')
   const snapshotScript = `<script>window.__BASHSTATS_DATA__ = ${safeJson};</script>`
   const injectedHtml = dashboardHtml.replace('</head>', `${snapshotScript}\n</head>`)
 

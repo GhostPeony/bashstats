@@ -25,6 +25,7 @@ export interface UserRow {
   is_public: boolean
   show_on_leaderboard: boolean
   anonymous_display: boolean
+  hide_projects: boolean
   api_token: string
   created_at: string
   updated_at: string
@@ -38,9 +39,12 @@ export async function getUserByToken(token: string): Promise<UserRow | null> {
   return rows[0] ?? null
 }
 
+// Columns safe to return for public-facing queries (excludes api_token)
+const PUBLIC_COLUMNS = `id, github_id, username, display_name, avatar_url, total_xp, rank_number, rank_tier, total_sessions, total_prompts, total_hours, current_streak, longest_streak, badges_unlocked, total_tokens, snapshot, bio, location, website, twitter, github_url, is_public, show_on_leaderboard, anonymous_display, hide_projects, created_at, updated_at, last_upload_at`
+
 export async function getUserByUsername(username: string): Promise<UserRow | null> {
   const { rows } = await sql<UserRow>`
-    SELECT * FROM users WHERE username = ${username} LIMIT 1
+    SELECT id, github_id, username, display_name, avatar_url, total_xp, rank_number, rank_tier, total_sessions, total_prompts, total_hours, current_streak, longest_streak, badges_unlocked, total_tokens, snapshot, bio, location, website, twitter, github_url, is_public, show_on_leaderboard, anonymous_display, hide_projects, api_token, created_at, updated_at, last_upload_at FROM users WHERE username = ${username} LIMIT 1
   `
   return rows[0] ?? null
 }
@@ -128,6 +132,7 @@ export async function updateUserProfile(
     isPublic?: boolean
     showOnLeaderboard?: boolean
     anonymousDisplay?: boolean
+    hideProjects?: boolean
   },
 ): Promise<void> {
   await sql`
@@ -141,6 +146,7 @@ export async function updateUserProfile(
       is_public = COALESCE(${fields.isPublic ?? null}, is_public),
       show_on_leaderboard = COALESCE(${fields.showOnLeaderboard ?? null}, show_on_leaderboard),
       anonymous_display = COALESCE(${fields.anonymousDisplay ?? null}, anonymous_display),
+      hide_projects = COALESCE(${fields.hideProjects ?? null}, hide_projects),
       updated_at = NOW()
     WHERE id = ${userId}
   `
@@ -207,7 +213,7 @@ export async function getLeaderboard(
   // Use pool.query for dynamic ORDER BY (tagged templates don't support dynamic column names)
   const pool = createPool()
   const { rows: users } = await pool.query(
-    `SELECT * FROM users WHERE total_xp > 0 AND show_on_leaderboard = true ORDER BY ${sortColumn} DESC, id ASC LIMIT $1 OFFSET $2`,
+    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE total_xp > 0 AND show_on_leaderboard = true ORDER BY ${sortColumn} DESC, id ASC LIMIT $1 OFFSET $2`,
     [limit, offset],
   )
 

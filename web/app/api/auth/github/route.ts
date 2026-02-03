@@ -19,11 +19,14 @@ export async function GET(req: NextRequest) {
 
   const publicOrigin = process.env.PUBLIC_URL || req.nextUrl.origin
 
-  // If the request is on a different origin than PUBLIC_URL, redirect there first
+  // If the request host doesn't match PUBLIC_URL, redirect to the canonical domain
   // so the oauth_state cookie is set on the same domain as the callback
-  if (process.env.PUBLIC_URL && req.nextUrl.origin !== process.env.PUBLIC_URL) {
-    const canonicalUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, process.env.PUBLIC_URL)
-    return NextResponse.redirect(canonicalUrl.toString())
+  if (process.env.PUBLIC_URL) {
+    const publicHost = new URL(process.env.PUBLIC_URL).host
+    if (req.nextUrl.host !== publicHost) {
+      const canonicalUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, process.env.PUBLIC_URL)
+      return NextResponse.redirect(canonicalUrl.toString())
+    }
   }
   const stateParam = req.nextUrl.searchParams.get('state') ?? ''
 

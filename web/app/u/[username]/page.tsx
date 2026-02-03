@@ -88,7 +88,7 @@ export default async function ProfilePage({ params }: Props) {
           )}
           <div className="profile-info">
             <h1>{displayName}</h1>
-            <p>@{user.username}</p>
+            <p><a href={`https://github.com/${user.username}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-secondary)' }}>@{user.username}</a></p>
             {user.bio && <p style={{ marginTop: 4 }}>{user.bio}</p>}
             <ProfileMeta user={user} />
           </div>
@@ -145,7 +145,7 @@ export default async function ProfilePage({ params }: Props) {
   )
 
   return (
-    <div className="container" style={{ paddingTop: 24, paddingBottom: 40 }}>
+    <div className="profile-container">
       <div className="profile-header">
         {user.avatar_url && (
           <img
@@ -159,7 +159,7 @@ export default async function ProfilePage({ params }: Props) {
         <div className="profile-info">
           <h1>{displayName}</h1>
           <p>
-            @{user.username} &middot; {user.rank_tier} {user.rank_number} &middot;{' '}
+            <a href={`https://github.com/${user.username}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-secondary)' }}>@{user.username}</a> &middot; {user.rank_tier} {user.rank_number} &middot;{' '}
             {user.total_xp.toLocaleString()} XP
           </p>
           {user.bio && <p style={{ marginTop: 4 }}>{user.bio}</p>}

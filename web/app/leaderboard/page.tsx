@@ -4,6 +4,20 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Leaderboard - bashstats',
   description: 'Global leaderboard for bashstats users ranked by XP, sessions, streaks, and badges.',
+  openGraph: {
+    title: 'Leaderboard - bashstats',
+    description: 'Global leaderboard for bashstats users ranked by XP, sessions, streaks, and badges.',
+    url: 'https://bashstats.com/leaderboard',
+    siteName: 'bashstats',
+    images: [{ url: 'https://bashstats.com/bashstats3.jpg', width: 1200, height: 630 }],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Leaderboard - bashstats',
+    description: 'Global leaderboard for bashstats users ranked by XP, sessions, streaks, and badges.',
+    images: ['https://bashstats.com/bashstats3.jpg'],
+  },
 }
 
 const COLUMNS = [

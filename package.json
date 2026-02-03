@@ -1,7 +1,13 @@
 {
   "name": "bashstats",
   "version": "0.2.3",
-  "description": "Obsessive stat tracking, achievements, and badges for Claude Code users",
+  "description": "Obsessive stat tracking, achievements, and badges for AI coding agents",
+  "homepage": "https://bashstats.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GhostPeony/bashstats.git"
+  },
+  "author": "Ghost Peony LLC",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,7 +30,15 @@
     "stats",
     "achievements",
     "badges",
-    "developer-tools"
+    "developer-tools",
+    "gemini-cli",
+    "copilot",
+    "leaderboard",
+    "coding-stats",
+    "mcp",
+    "ai-coding",
+    "profiles",
+    "streak"
   ],
   "license": "MIT",
   "engines": {

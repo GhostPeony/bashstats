@@ -31,14 +31,20 @@ export async function POST(req: NextRequest) {
   lastUpload.set(user.id, now)
 
   // Limit request body size (snapshot is ~60KB, reject anything over 500KB)
-  const contentLength = parseInt(req.headers.get('content-length') || '0', 10)
-  if (contentLength > 512_000) {
+  const MAX_BODY = 512_000
+  let bodyText: string
+  try {
+    bodyText = await req.text()
+  } catch {
+    return NextResponse.json({ error: 'Failed to read body' }, { status: 400 })
+  }
+  if (bodyText.length > MAX_BODY) {
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
 
   let snapshot: ProfileSnapshot
   try {
-    snapshot = (await req.json()) as ProfileSnapshot
+    snapshot = JSON.parse(bodyText) as ProfileSnapshot
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }

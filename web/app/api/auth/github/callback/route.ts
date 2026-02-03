@@ -104,11 +104,24 @@ export async function GET(req: NextRequest) {
   })
 
   // Build redirect response
-  const response = stateObj.cli_callback
-    ? NextResponse.redirect(
-        `${stateObj.cli_callback}?token=${apiToken}&username=${user.username}&state=${stateObj.state ?? ''}`,
-      )
-    : NextResponse.redirect(`${process.env.PUBLIC_URL}/u/${user.username}`)
+  let response: NextResponse
+  if (stateObj.cli_callback) {
+    // Validate CLI callback is localhost only to prevent open redirect / token theft
+    let callbackUrl: URL
+    try {
+      callbackUrl = new URL(stateObj.cli_callback)
+    } catch {
+      return NextResponse.json({ error: 'Invalid callback URL' }, { status: 400 })
+    }
+    if (callbackUrl.hostname !== 'localhost' && callbackUrl.hostname !== '127.0.0.1') {
+      return NextResponse.json({ error: 'Callback must be localhost' }, { status: 400 })
+    }
+    response = NextResponse.redirect(
+      `${stateObj.cli_callback}?token=${apiToken}&username=${user.username}&state=${stateObj.state ?? ''}`,
+    )
+  } else {
+    response = NextResponse.redirect(`${process.env.PUBLIC_URL}/u/${user.username}`)
+  }
 
   // Set session cookie
   response.cookies.set('bashstats_session', sessionToken, {

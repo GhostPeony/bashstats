@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params
   const user = await getUserByUsername(username)
 
-  if (!user) {
+  if (!user || !user.is_public) {
     return { title: 'User not found - bashstats' }
   }
 

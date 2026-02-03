@@ -72,11 +72,11 @@ export async function GET(req: NextRequest) {
     apiToken = crypto.randomBytes(32).toString('hex')
   }
 
-  // Upsert user
+  // Upsert user — only set display_name for new users; existing users keep their settings value
   const user = await upsertUser({
     githubId: ghUser.id,
     username: ghUser.login,
-    displayName: ghUser.name,
+    displayName: existingUser ? existingUser.display_name : ghUser.name,
     avatarUrl: ghUser.avatar_url,
     apiToken,
   })
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
   // Set session cookie on the response object directly
   response.cookies.set('bashstats_session', sessionToken, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 30 * 24 * 60 * 60, // 30 days
     path: '/',

@@ -13,8 +13,8 @@ export async function POST() {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  trackEvent('account_delete', user.id)
   await deleteUser(user.id)
+  trackEvent('account_delete', null, { deleted_user_id: user.id, username: user.username })
   await clearSessionCookie()
 
   return NextResponse.json({ ok: true })

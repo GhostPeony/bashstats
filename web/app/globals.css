@@ -309,6 +309,13 @@ a:hover {
   user-select: all;
 }
 
+/* Profile page container — wider than default to give dashboard room */
+.profile-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 12px 40px;
+}
+
 /* Embedded profile frame */
 .profile-frame {
   width: 100%;

@@ -134,6 +134,19 @@ export function install(): { success: boolean; message: string } {
     // Write settings back
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
 
+    // Register MCP server in ~/.claude.json
+    const claudeJsonPath = path.join(os.homedir(), '.claude.json')
+    let claudeJson: Record<string, unknown> = {}
+    if (fs.existsSync(claudeJsonPath)) {
+      claudeJson = JSON.parse(fs.readFileSync(claudeJsonPath, 'utf-8'))
+    }
+    if (!claudeJson.mcpServers) claudeJson.mcpServers = {}
+    ;(claudeJson.mcpServers as Record<string, unknown>).bashstats = {
+      command: 'bashstats-mcp',
+      args: [],
+    }
+    fs.writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2), 'utf-8')
+
     return { success: true, message: 'bashstats hooks installed successfully.' }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -175,6 +188,17 @@ export function uninstall(): { success: boolean; message: string } {
     }
 
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+
+    // Remove MCP server from ~/.claude.json
+    const claudeJsonPath = path.join(os.homedir(), '.claude.json')
+    if (fs.existsSync(claudeJsonPath)) {
+      const claudeJson = JSON.parse(fs.readFileSync(claudeJsonPath, 'utf-8'))
+      if (claudeJson.mcpServers?.bashstats) {
+        delete claudeJson.mcpServers.bashstats
+        if (Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers
+        fs.writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2), 'utf-8')
+      }
+    }
 
     return { success: true, message: 'bashstats hooks removed successfully.' }
   } catch (err) {

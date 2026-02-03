@@ -333,6 +333,18 @@ export interface WeeklyGoalsPayload {
   }>
 }
 
+// === Profile Snapshot (for hosted profiles) ===
+
+export interface ProfileSnapshot {
+  uploaded_at: string
+  stats: AllStats
+  achievements: AchievementsPayload
+  activity: DailyActivityRow[]
+  sessions: SessionRow[]
+  weeklyGoals: WeeklyGoalsPayload
+  agents: AgentBreakdown
+}
+
 // === Rank Tier Bracket ===
 
 export interface RankTierBracket {

@@ -1,10 +1,10 @@
 # bashstats
 <img alt="bashstats dashboard" src="https://raw.githubusercontent.com/GhostPeony/bashstats/main/docs/dashboard.png" />
 
-Track every prompt, tool call, and late-night coding session. Earn badges. Build streaks. Climb 500 ranks from Bronze to System Anomaly.
+Track every prompt, tool call, and late-night coding session. Earn badges. Build streaks. Climb 500 ranks from Bronze to System Anomaly. Share your stats with a hosted profile at [bashstats.com](https://bashstats.com).
 
-bashstats hooks into Claude Code and quietly records everything — sessions, prompts, tool usage, errors, tokens, and streaks. It turns all of it into stats,
-124 achievements, weekly goals, and a dashboard you'll check way too often.
+bashstats hooks into Claude Code (and other AI coding agents) and quietly records everything — sessions, prompts, tool usage, errors, tokens, and streaks. It turns all of it into stats,
+124 achievements, weekly goals, and a dashboard you'll check way too often. Sign in with GitHub to sync your stats, get a public profile, and compete on the leaderboard.
   
 ## Install
 
@@ -24,6 +24,8 @@ bashstats init
 | `bashstats achievements` | List all badges with progress bars |
 | `bashstats streak` | Show current and longest daily streak |
 | `bashstats web` | Launch the browser dashboard |
+| `bashstats login` | Sign in with GitHub for syncing |
+| `bashstats share` | Upload stats and get your profile URL |
 | `bashstats export` | Export all data as JSON |
 | `bashstats reset` | Wipe all data |
 | `bashstats uninstall` | Remove hooks and data |
@@ -35,6 +37,19 @@ bashstats web --port 8080    # Custom port (default: 17900)
 bashstats web --no-open      # Don't auto-open browser
 ```
 
+## Hosted Profiles & Sharing
+
+bashstats can optionally sync your stats to [bashstats.com](https://bashstats.com) for a public profile and leaderboard placement.
+
+1. **Sign in** — `bashstats login` opens GitHub OAuth in your browser. Your account is created and linked automatically.
+2. **Sync** — After login, stats sync to bashstats.com automatically at the end of every session.
+3. **Share** — `bashstats share` uploads your latest stats on demand and prints your profile URL.
+4. **Profile** — Your hosted profile lives at `bashstats.com/u/username` and embeds the same dashboard you see locally — rank, badges, activity heatmap, and stats.
+5. **Leaderboard** — Compete globally at [bashstats.com/leaderboard](https://bashstats.com/leaderboard), sortable by XP, rank, sessions, streaks, badges, and tokens.
+6. **Privacy** — Control visibility from the [settings page](https://bashstats.com/settings). Hide from the leaderboard, go anonymous, or keep your profile fully private.
+
+Signing in is optional. bashstats works entirely offline without it.
+
 ## Dashboard
 
 The browser dashboard at `http://localhost:17900` includes:
@@ -43,6 +58,8 @@ The browser dashboard at `http://localhost:17900` includes:
 - **Stats** - Lifetime totals, tool breakdowns, time analysis, session records, and project stats in a 2x2 grid
 - **Achievements** - All 124 badges with tier progress, organized by category
 - **Timeline** - Activity heatmap and session history with sparkline charts
+
+Hosted profiles at `bashstats.com/u/username` embed the same dashboard, accessible to anyone with the link.
 
 ## What Gets Tracked
 
@@ -278,7 +295,7 @@ The server is registered in `~/.claude.json` and runs via stdio. `bashstats unin
 
 ## Data Storage
 
-All data is stored locally in `~/.bashstats/bashstats.db` (SQLite with WAL mode). Nothing is sent anywhere. Tables:
+All data is stored locally in `~/.bashstats/bashstats.db` (SQLite with WAL mode). Nothing is sent anywhere unless you opt in with `bashstats login`, which syncs aggregated stats to bashstats.com for your hosted profile and leaderboard placement. Tables:
 
 - `events` - Every hook event with full context
 - `sessions` - Session lifecycle (start, end, duration, counts, token usage)

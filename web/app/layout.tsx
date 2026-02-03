@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import { getSession } from '@/lib/auth'
 import UserMenu from './user-menu'
@@ -7,6 +8,20 @@ import UserMenu from './user-menu'
 export const metadata: Metadata = {
   title: 'bashstats - Developer Stats & Achievements',
   description: 'Obsessive stat tracking, achievements, and badges for Claude Code and AI coding tools.',
+  openGraph: {
+    title: 'bashstats - Developer Stats & Achievements',
+    description: 'Obsessive stat tracking, achievements, and badges for Claude Code and AI coding tools.',
+    url: 'https://bashstats.com',
+    siteName: 'bashstats',
+    images: [{ url: 'https://bashstats.com/bashstats3.jpg', width: 1200, height: 630 }],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'bashstats - Developer Stats & Achievements',
+    description: 'Obsessive stat tracking, achievements, and badges for Claude Code and AI coding tools.',
+    images: ['https://bashstats.com/bashstats3.jpg'],
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -61,6 +76,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </nav>
         {children}
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

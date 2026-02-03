@@ -103,24 +103,22 @@ export async function GET(req: NextRequest) {
     githubId: user.github_id,
   })
 
-  // Build redirect response — web redirects to profile (no auth required) to avoid loops
-  const origin = process.env.PUBLIC_URL || req.nextUrl.origin
+  // Build redirect response
   const response = stateObj.cli_callback
     ? NextResponse.redirect(
         `${stateObj.cli_callback}?token=${apiToken}&username=${user.username}&state=${stateObj.state ?? ''}`,
       )
-    : NextResponse.redirect(new URL(`/u/${user.username}`, origin))
+    : NextResponse.redirect(`${process.env.PUBLIC_URL}/u/${user.username}`)
 
-  // Set session cookie via raw header to ensure it survives the redirect
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
-  response.headers.append(
-    'Set-Cookie',
-    `bashstats_session=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}${secure}`,
-  )
-  response.headers.append(
-    'Set-Cookie',
-    `oauth_state=; Path=/; HttpOnly; Max-Age=0`,
-  )
+  // Set session cookie
+  response.cookies.set('bashstats_session', sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    path: '/',
+  })
+  response.cookies.delete('oauth_state')
 
   return response
 }
